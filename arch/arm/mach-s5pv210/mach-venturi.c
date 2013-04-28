@@ -355,7 +355,6 @@ static struct s3cfb_lcd hx8369 = {
 #define  S5PV210_ANDROID_PMEM_MEMSIZE_PMEM_ADSP (1500 * SZ_1K)
 #define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_TEXTSTREAM (3000 * SZ_1K)
 
-
 static struct s5p_media_device aries_media_devs[] = {
 	[0] = {
 		.id = S5P_MDEV_MFC,
