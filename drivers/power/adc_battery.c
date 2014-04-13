@@ -256,7 +256,7 @@ static struct power_supply s3c_power_supplies[] = {
 }
 
 static struct device_attribute s3c_battery_attrs[] = {
-	SEC_BATTERY_ATTR(batt_vol),
+	SEC_BATTERY_ATTR(voltage_now),
 	SEC_BATTERY_ATTR(batt_vol_adc),
 	SEC_BATTERY_ATTR(batt_vol_adc_cal),
 	SEC_BATTERY_ATTR(batt_temp),
@@ -273,7 +273,7 @@ static struct device_attribute s3c_battery_attrs[] = {
 #endif /* __TEST_MODE_INTERFACE__ */
 	SEC_BATTERY_ATTR(batt_v_f_adc),
 #ifdef __CHECK_CHG_CURRENT__
-	SEC_BATTERY_ATTR(batt_chg_current),
+	SEC_BATTERY_ATTR(current_now),
 	SEC_BATTERY_ATTR(batt_chg_current_adc),
 #endif /* __CHECK_CHG_CURRENT__ */
 	SEC_BATTERY_ATTR(charging_source),
