@@ -21,6 +21,9 @@
 #include <linux/regulator/consumer.h>
 #include <linux/cpufreq.h>
 #include <linux/platform_device.h>
+#include <linux/delay.h>
+#include<linux/kthread.h>
+#include<linux/sched.h>
 
 #include <mach/map.h>
 #include <mach/regs-clock.h>
@@ -31,6 +34,20 @@ static struct clk *dmc0_clk;
 static struct clk *dmc1_clk;
 static struct cpufreq_freqs freqs;
 static DEFINE_MUTEX(set_freq_lock);
+
+/* Placeholder for policy values during suspend */
+static int max,min,usermax,usermin = 0;
+
+/* Flag to let thread know to cancel if
+SUSPEND_PREPARE is called while thread is
+waiting. */
+static bool cancel_cpu_policy_reset = false;
+
+/* Placeholder for policy values during suspend */
+static struct cpufreq_governor *gov;
+
+/* Placeholder for policy values during suspend */
+static struct cpufreq_governor *usergov;
 
 /* APLL M,P,S values for 1.2G/1G/800Mhz */
 #define APLL_VAL_1700   ((1<<31)|(425<<16)|(6<<8)|(1))
@@ -740,19 +757,95 @@ static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
 	return ret;
 }
 
+static struct task_struct *task;
+
+static int delayed_reset_cpu_policy()
+{
+#ifdef CONFIG_CPU_SOD_PATCH_DEBUG
+	printk(KERN_ERR "[SOD PATCH]: delayed_reset_cpu_policy ENTER\n");
+#endif
+	int timedelayed = 0;
+
+	/* Wait for 1 second, checking for cancels every 100ms*/
+	while(timedelayed < 1000){
+
+		if(cancel_cpu_policy_reset){
+#ifdef CONFIG_CPU_SOD_PATCH_DEBUG
+			printk(KERN_ERR "[SOD PATCH]: Thread cancelled - timedelayed=%d\n",timedelayed);
+			printk("[SOD PATCH]: EXIT");
+#endif
+			do_exit(0);
+			return 0;
+		}
+
+		mdelay(100);
+		timedelayed += 100;
+	}
+
+	if(!cancel_cpu_policy_reset){
+		if(min > 0) {
+
+			/* We waited for 1 second and we didn't get canceled
+			Restore cpufreq policy */
+			struct cpufreq_policy *policy = cpufreq_cpu_get(0);
+			policy->max = max;
+			policy->user_policy.max = usermax;
+			policy->min = min;
+			policy->user_policy.min = usermin;
+			policy->governor = gov;
+			policy->user_policy.governor = usergov;
+			cpufreq_driver_target(policy, SLEEP_FREQ,
+					ENABLE_FURTHER_CPUFREQ);
+#ifdef CONFIG_CPU_SOD_PATCH_DEBUG
+			printk("[SOD PATCH]: Resetting policy values min=%d max=%d usermin=%d usermax=%d\n",
+				min,max,usermin,usermax);
+#endif
+
+			/* Resume complete. Reset values, most importantly "min" */
+			min = max = usermin = usermax = 0;
+		}
+	}
+#ifdef CONFIG_CPU_SOD_PATCH_DEBUG
+	printk("[SOD PATCH]: EXIT");
+#endif
+	do_exit(0);
+	return 0;
+}
+
 static int s5pv210_cpufreq_notifier_event(struct notifier_block *this,
 		unsigned long event, void *ptr)
 {
-        static int max,min;
 	int ret;
 
         struct cpufreq_policy *policy = cpufreq_cpu_get(0);
 
 	switch (event) {
 	case PM_SUSPEND_PREPARE:
-		max = policy->max;
-		min = policy->min;
+
+		/* If there is a "delayed_reset_cpu_policy" thread running
+		notify it to cancel */
+		cancel_cpu_policy_reset = true;
+
+		/* Only store these values once per suspend/resume cycle */
+		if(min == 0){
+			max = policy->max;
+			min = policy->min;
+			gov = policy->governor;
+			usermax = policy->user_policy.max;
+			usermin = policy->user_policy.min;
+			usergov = policy->user_policy.governor;
+#ifdef CONFIG_CPU_SOD_PATCH_DEBUG
+			printk("[SOD PATCH]: Storing policy values min=%d max=%d usermin=%d usermax=%d\n",
+				min,max,usermin,usermax);
+#endif
+		}
+
+		/* Set min and max freq to SLEEP_FREQ (800MHz) and governor to "ondemand" */
 		policy->max = policy->min = SLEEP_FREQ;
+		policy->user_policy.min = policy->min;
+		policy->user_policy.max = policy->max;
+		policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
+		policy->user_policy.governor = CPUFREQ_DEFAULT_GOVERNOR;
 		ret = cpufreq_driver_target(policy, SLEEP_FREQ,
 				DISABLE_FURTHER_CPUFREQ);
 		if (ret < 0)
@@ -760,10 +853,19 @@ static int s5pv210_cpufreq_notifier_event(struct notifier_block *this,
 		return NOTIFY_OK;
 	case PM_POST_RESTORE:
 	case PM_POST_SUSPEND:
+
+		/* Restore max freq to stored max (if higher than SLEEP_FREQ; should speed up resume */
+		policy->max = max;
+		policy->user_policy.max = usermax;
 		cpufreq_driver_target(policy, SLEEP_FREQ,
 				ENABLE_FURTHER_CPUFREQ);
-		policy->max = max;
-		policy->min = min;
+
+		/* Any previous "delayed_reset_cpu_policy" thread should have canceled by now */
+		cancel_cpu_policy_reset = false;
+
+		/* create new "delayed_reset_cpu_policy" thread */
+		task = kthread_create(&delayed_reset_cpu_policy,NULL,"[SOD PATCH DELAY THREAD]");
+		wake_up_process(task);
 		return NOTIFY_OK;
 	}
 	return NOTIFY_DONE;
@@ -776,7 +878,6 @@ static int s5pv210_cpufreq_reboot_notifier_event(struct notifier_block *this,
 
 	ret = cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ,
 			DISABLE_FURTHER_CPUFREQ);
-	if (ret < 0)
 		return NOTIFY_BAD;
 
 	return NOTIFY_DONE;

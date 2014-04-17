@@ -394,6 +394,11 @@ config CPU_DIDLE
 	depends on CPU_IDLE
 	default n
 
+config CPU_SOD_PATCH_DEBUG
+	bool "SOD Patch debugging messages"
+	depends on CPU_FREQ
+	default y
+
 config WIFI_CONTROL_FUNC
        bool "Enable WiFi control function abstraction"
        help
