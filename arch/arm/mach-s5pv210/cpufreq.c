@@ -39,17 +39,6 @@ static DEFINE_MUTEX(set_freq_lock);
 /* Placeholder for policy values during suspend */
 static int max,min,usermax,usermin = 0;
 
-/* Flag to let thread know to cancel if
-SUSPEND_PREPARE is called while thread is
-waiting. */
-static bool cancel_cpu_policy_reset = false;
-
-/* Placeholder for policy values during suspend */
-static struct cpufreq_governor *gov;
-
-/* Placeholder for policy values during suspend */
-static struct cpufreq_governor *usergov;
-
 /* APLL M,P,S values for 1.2G/1G/800Mhz */
 #define APLL_VAL_1700   ((1<<31)|(425<<16)|(6<<8)|(1))
 #define APLL_VAL_1600   ((1<<31)|(200<<16)|(3<<8)|(1))
@@ -689,7 +678,7 @@ static void s5pv210_cpufreq_esuspend(struct early_suspend *h)
 {
 	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
 	int ret = -1;
-	int retries = 5;
+	int retries = 0;
 
 	max = policy->max;
 	min = policy->min;
@@ -700,23 +689,31 @@ static void s5pv210_cpufreq_esuspend(struct early_suspend *h)
 		min,max,usermin,usermax);
 #endif
 
-/* Set min and max freq to SLEEP_FREQ (800MHz) and governor to "ondemand" */
+/* Set min and max freq to SLEEP_FREQ (800MHz) */
 	policy->max = policy->min = SLEEP_FREQ;
 	policy->user_policy.min = policy->min;
 	policy->user_policy.max = policy->max;
 
-	while(ret < 0 & retries < 5) {
+	while(retries < 5) {
 		ret = cpufreq_driver_target(policy, SLEEP_FREQ,
 				DISABLE_FURTHER_CPUFREQ);
-		cpufreq_update_policy(0);
 
 #ifdef CONFIG_CPU_SOD_PATCH_DEBUG
-		printk("[SOD PATCH]: CPU FREQ = %d\n",cpufreq_quick_get(0));
+		printk("[SOD PATCH]: Trying to set policy - tries=%d\n", retries);
 #endif
+		if(ret >= 0)
+			break;
 		retries += 1;
 		mdelay(10);
 	}
+	/* Make sure we get up to SLEEP_FREQ (800MHz) before we continue */
+	while(cpufreq_quick_get(0) < SLEEP_FREQ) {
 
+#ifdef CONFIG_CPU_SOD_PATCH_DEBUG
+	printk("[SOD PATCH]: CPU FREQ = %d\n",cpufreq_quick_get(0));
+#endif
+		mdelay(10);
+	}
 #ifdef CONFIG_CPU_SOD_PATCH_DEBUG
 	printk("[SOD PATCH]: CPU FREQ = %d\n",cpufreq_quick_get(0));
 #endif
@@ -759,7 +756,9 @@ static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
 {
 	unsigned long mem_type;
 	int ret;
-
+#ifdef CONFIG_DVFS_LIMIT
+	int i;
+#endif
 	cpu_clk = clk_get(NULL, "armclk");
 	if (IS_ERR(cpu_clk))
 		return PTR_ERR(cpu_clk);
@@ -805,7 +804,6 @@ static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
 	policy->cpuinfo.transition_latency = 40000;
 
 #ifdef CONFIG_DVFS_LIMIT
-	int i;
 	for (i = 0; i < DVFS_LOCK_TOKEN_NUM; i++)
 		g_dvfslockval[i] = MAX_PERF_LEVEL;
 #endif
