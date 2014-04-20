@@ -21,10 +21,6 @@
 #include <linux/regulator/consumer.h>
 #include <linux/cpufreq.h>
 #include <linux/platform_device.h>
-#include <linux/delay.h>
-#include<linux/kthread.h>
-#include<linux/sched.h>
-#include<linux/earlysuspend.h>
 
 #include <mach/map.h>
 #include <mach/regs-clock.h>
@@ -35,9 +31,6 @@ static struct clk *dmc0_clk;
 static struct clk *dmc1_clk;
 static struct cpufreq_freqs freqs;
 static DEFINE_MUTEX(set_freq_lock);
-
-/* Placeholder for policy values during suspend */
-static int max,min,usermax,usermin = 0;
 
 /* APLL M,P,S values for 1.2G/1G/800Mhz */
 #define APLL_VAL_1700   ((1<<31)|(425<<16)|(6<<8)|(1))
@@ -100,8 +93,10 @@ static struct cpufreq_frequency_table s5pv210_freq_table[] = {
 	{L0, 1000*1000},
 	{L1, 800*1000},
 	{L2, 400*1000},
+#ifdef CONFIG_METICULUS_SUSPENSION
 	{L3, 200*1000},
 	{L4, 100*1000},
+#endif
 	{0, CPUFREQ_TABLE_END},
 };
 
@@ -168,6 +163,7 @@ static struct s5pv210_dvs_conf dvs_conf[] = {
 		.arm_volt   = 1050000,
 		.int_volt   = 1100000,
 	},
+#ifdef CONFIG_METICULUS_SUSPENSION
 	[L3] = {
 		.arm_volt   = 950000,
 		.int_volt   = 1100000,
@@ -176,6 +172,7 @@ static struct s5pv210_dvs_conf dvs_conf[] = {
 		.arm_volt   = 950000,
 		.int_volt   = 1000000,
 	},
+#endif
 };
 
 static u32 clkdiv_val[13][11] = {
@@ -410,7 +407,11 @@ static int s5pv210_target(struct cpufreq_policy *policy,
 		pll_changing = 1;
 
 	/* Check if there need to change System bus clock */
+#ifdef CONFIG_METICULUS_SUSPENSION
 	if ((index == L4) || (freqs.old == s5pv210_freq_table[L4].frequency))
+#else
+	if ((index == L2) || (freqs.old == s5pv210_freq_table[L2].frequency))
+#endif
 		bus_speed_changing = 1;
 
 	if (bus_speed_changing) {
@@ -626,6 +627,7 @@ static int s5pv210_target(struct cpufreq_policy *policy,
 		} while (reg & (1 << 15));
 
 		/* Reconfigure DRAM refresh counter value */
+#ifdef CONFIG_METICULUS_SUSPENSION
 		if (index != L4) {
 			/*
 			 * DMC0 : 166Mhz
@@ -641,6 +643,14 @@ static int s5pv210_target(struct cpufreq_policy *policy,
 			s5pv210_set_refresh(DMC0, 83000);
 			s5pv210_set_refresh(DMC1, 100000);
 		}
+#else
+		/*
+		* DMC0 : 166Mhz
+		* DMC1 : 200Mhz
+		*/
+		s5pv210_set_refresh(DMC0, 166000);
+		s5pv210_set_refresh(DMC1, 200000);
+#endif
 	}
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
@@ -674,68 +684,6 @@ static int s5pv210_cpufreq_resume(struct cpufreq_policy *policy)
 }
 #endif
 
-static void s5pv210_cpufreq_esuspend(struct early_suspend *h)
-{
-	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
-	int ret = -1;
-	int retries = 0;
-
-	max = policy->max;
-	min = policy->min;
-	usermax = policy->user_policy.max;
-	usermin = policy->user_policy.min;
-#ifdef CONFIG_CPU_SOD_PATCH_DEBUG
-	printk("[SOD PATCH]: Storing policy values min=%d max=%d usermin=%d usermax=%d\n",
-		min,max,usermin,usermax);
-#endif
-
-/* Set min and max freq to SLEEP_FREQ (800MHz) */
-	policy->max = policy->min = SLEEP_FREQ;
-	policy->user_policy.min = policy->min;
-	policy->user_policy.max = policy->max;
-
-	while(retries < 5) {
-		ret = cpufreq_driver_target(policy, SLEEP_FREQ,
-				DISABLE_FURTHER_CPUFREQ);
-
-#ifdef CONFIG_CPU_SOD_PATCH_DEBUG
-		printk("[SOD PATCH]: Trying to set policy - tries=%d\n", retries);
-#endif
-		if(ret >= 0)
-			break;
-		retries += 1;
-		mdelay(10);
-	}
-	/* Make sure we get up to SLEEP_FREQ (800MHz) before we continue */
-	while(cpufreq_quick_get(0) < SLEEP_FREQ) {
-
-#ifdef CONFIG_CPU_SOD_PATCH_DEBUG
-	printk("[SOD PATCH]: CPU FREQ = %d\n",cpufreq_quick_get(0));
-#endif
-		mdelay(10);
-	}
-#ifdef CONFIG_CPU_SOD_PATCH_DEBUG
-	printk("[SOD PATCH]: CPU FREQ = %d\n",cpufreq_quick_get(0));
-#endif
-
-}
-
-static void s5pv210_cpufreq_eresume(struct early_suspend *h)
-{
-	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
-
-	cpufreq_driver_target(policy, SLEEP_FREQ,
-			ENABLE_FURTHER_CPUFREQ);
-	policy->max = max;
-	policy->user_policy.max = usermax;
-	policy->min = min;
-	policy->user_policy.min = usermin;
-#ifdef CONFIG_CPU_SOD_PATCH_DEBUG
-	printk("[SOD PATCH]: Resetting policy values min=%d max=%d usermin=%d usermax=%d\n",
-		min,max,usermin,usermax);
-#endif
-}
-
 static int check_mem_type(void __iomem *dmc_reg)
 {
 	unsigned long val;
@@ -745,12 +693,6 @@ static int check_mem_type(void __iomem *dmc_reg)
 
 	return val >> 8;
 }
-
-static struct early_suspend early_suspend_handler = {
-	.level = 0,
-	.suspend = s5pv210_cpufreq_esuspend,
-	.resume	= s5pv210_cpufreq_eresume,
-};
 
 static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
 {
@@ -810,12 +752,12 @@ static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
 
 	/* Set max freq to 1GHz on startup */
 	ret = cpufreq_frequency_table_cpuinfo(policy, s5pv210_freq_table);
+#ifdef CONFIG_METICULUS_SUSPENSION
+	policy->min = 100000;
+#else
 	policy->min = 400000;
+#endif
 	policy->max = 1000000;
-
-	/* register earlysuspend handler */
-	struct early_suspend *handler = &early_suspend_handler;
-	register_early_suspend(handler);
 
 	return ret;
 }
@@ -823,6 +765,31 @@ static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
 static int s5pv210_cpufreq_notifier_event(struct notifier_block *this,
 		unsigned long event, void *ptr)
 {
+#ifndef CONFIG_METICULUS_SUSPENSION
+	static int max,min;
+	int ret;
+
+        struct cpufreq_policy *policy = cpufreq_cpu_get(0);
+
+	switch (event) {
+	case PM_SUSPEND_PREPARE:
+		max = policy->max;
+		min = policy->min;
+		policy->max = policy->min = SLEEP_FREQ;
+		ret = cpufreq_driver_target(policy, SLEEP_FREQ,
+				DISABLE_FURTHER_CPUFREQ);
+		if (ret < 0)
+			return NOTIFY_BAD;
+		return NOTIFY_OK;
+	case PM_POST_RESTORE:
+	case PM_POST_SUSPEND:
+		cpufreq_driver_target(policy, SLEEP_FREQ,
+				ENABLE_FURTHER_CPUFREQ);
+		policy->max = max;
+		policy->min = min;
+		return NOTIFY_OK;
+	}
+#endif
 	return NOTIFY_DONE;
 }
 

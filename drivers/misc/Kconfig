@@ -612,4 +612,10 @@ config PN544
 	help
 	  NXP PN544 Near Field Communication controller support.
 
+config METICULUS_SUSPENSION
+	bool "Meticulus Suspend/Resume Cpu frequency Controller"
+	default n
+	help
+	  Fined grained control over the suspend and resume process.
+
 endif # MISC_DEVICES

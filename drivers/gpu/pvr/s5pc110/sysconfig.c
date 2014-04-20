@@ -124,7 +124,11 @@ static struct notifier_block cpufreq_limit_notifier = {
 static PVRSRV_ERROR EnableSGXClocks(void)
 {
 #ifdef CONFIG_DVFS_LIMIT
+#ifdef CONFIG_METICULUS_SUSPENSION
 	s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_PVR, L3); /* 200 MHz */
+#else
+	s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_PVR, L4); /* 400 MHz */
+#endif
 #endif
 	regulator_enable(g3d_pd_regulator);
 	clk_enable(g3d_clock);

@@ -889,7 +889,11 @@ void  get_message(struct work_struct * p)
 	if (num_of_touch > 0) {
 		if(touch_state_val == 0)
 		{
+#ifdef CONFIG_METICULUS_SUSPENSION
 			s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_7, L3); // cpu high speed setting.
+#else
+			s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_7, L4); // cpu high speed setting.
+#endif
 			resume_dvfs_lock = false;
 			touch_state_val = 1;
 		}
@@ -900,7 +904,11 @@ void  get_message(struct work_struct * p)
 		// first touch pressed!
 		if(touch_state_val == 0)
 		{
+#ifdef CONFIG_METICULUS_SUSPENSION
 			s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_7, L3); // cpu high speed setting.
+#else
+			s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_7, L4); // cpu high speed setting.
+#endif
 			resume_dvfs_lock = false;
 			touch_state_val = 1;
 		}
@@ -935,7 +943,11 @@ void  get_message(struct work_struct * p)
 #if TOUCH_DVFS_CONTROL
 			if(touch_state_val == 0)
 			{
+#ifdef CONFIG_METICULUS_SUSPENSION
 				s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_7, L3); // cpu high speed setting.
+#else
+				s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_7, L4); // cpu high speed setting.
+#endif
 				resume_dvfs_lock = false;
 				touch_state_val = 1;
 			}
@@ -978,7 +990,11 @@ void  get_message(struct work_struct * p)
 #if TOUCH_DVFS_CONTROL
 			if(touch_state_val == 0)
 			{
+#ifdef CONFIG_METICULUS_SUSPENSION
 				s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_7, L3); // cpu high speed setting.
+#else
+				s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_7, L4); // cpu high speed setting.
+#endif
 				resume_dvfs_lock = false;
 				touch_state_val = 1;
 			}
@@ -1016,7 +1032,11 @@ void  get_message(struct work_struct * p)
 #if TOUCH_DVFS_CONTROL
 			if(touch_state_val == 0)
 			{
+#ifdef CONFIG_METICULUS_SUSPENSION
 				s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_7, L3); // cpu high speed setting.
+#else
+				s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_7, L4); // cpu high speed setting.
+#endif
 				resume_dvfs_lock = false;
 				touch_state_val = 1;
 			}
