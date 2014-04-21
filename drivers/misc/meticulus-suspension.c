@@ -21,10 +21,14 @@
 
 static bool debug = true;
 
+static bool enable_screenoff_freqs = false;
+
 static bool sleep_freq_is_set = false;
 
 /* Placeholder for policy values during suspend */
 static int max,min,usermax,usermin = 0;
+
+static int screenoff_freq_min, screenoff_freq_max = SLEEP_FREQ;
 
 enum cpufreq_access {
 	DISABLE_FURTHER_CPUFREQ = 0x10,
@@ -42,6 +46,16 @@ static void meticulus_wait_for_target_freq(void)
 	}
 	if(debug)
 		printk("[MET_SUS]: CPU FREQ = %d\n",cpufreq_quick_get(0));
+}
+
+static void meticulus_set_screenoff_freq(void)
+{
+	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
+	policy->max = screenoff_freq_max;
+	policy->min = screenoff_freq_min;
+	policy->user_policy.min = policy->min;
+	policy->user_policy.max = policy->max;
+	cpufreq_update_policy(0);
 }
 
 static void meticulus_set_sleep_freq(void)
@@ -67,7 +81,6 @@ static void meticulus_set_sleep_freq(void)
 		mdelay(10);
 		retries += 1;
 	}
-	meticulus_wait_for_target_freq();
 	sleep_freq_is_set = true;
 }
 
@@ -103,6 +116,8 @@ static void meticulus_restore_freqs(void)
 static void meticulus_early_suspend_enter(struct early_suspend *h)
 {
 	meticulus_store_freqs();
+	if(enable_screenoff_freqs)
+		meticulus_set_screenoff_freq();
 }
 static void meticulus_suspend_enter(void)
 {
@@ -160,6 +175,9 @@ int __init meticulus_suspend_init(void)
 }
 
 module_param_named(debug, debug, bool, S_IRUGO | S_IWUSR);
+module_param_named(enable_screenoff_freqs, enable_screenoff_freqs, bool, S_IRUGO | S_IWUSR);
+module_param_named(screenoff_freq_min, screenoff_freq_min, int, S_IRUGO | S_IWUSR);
+module_param_named(screenoff_freq_max, screenoff_freq_max, int, S_IRUGO | S_IWUSR);
 
 module_init(meticulus_suspend_init);
 
