@@ -409,10 +409,8 @@ static int s5pv210_target(struct cpufreq_policy *policy,
 	/* Check if there need to change System bus clock */
 #ifdef CONFIG_METICULUS_SUSPENSION
 	if ((index == L4) || (freqs.old == s5pv210_freq_table[L4].frequency))
-#else
-	if ((index == L2) || (freqs.old == s5pv210_freq_table[L2].frequency))
-#endif
 		bus_speed_changing = 1;
+#endif
 
 	if (bus_speed_changing) {
 		/*
