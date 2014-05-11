@@ -170,6 +170,8 @@ EXPORT_SYMBOL(sec_get_param_value);
 
 static char * wlan_mac = "00:90:4c:11:22:33";
 
+static char * variant_code = "XAA";
+
 static struct sk_buff *wlan_static_skb[WLAN_SKB_BUF_NUM];
 
 struct wifi_mem_prealloc {
@@ -1444,18 +1446,15 @@ static struct touchkey_platform_data touchkey_data = {
 };
 #endif
 
-static struct gpio_event_direct_entry aries_keypad_key_map[] = {
+static struct gpio_event_direct_entry aries_keypad_key_map_int[] = {
 		{
 			.gpio	= S5PV210_GPH2(6),
 			.code	= KEY_POWER,
 		},
-#if defined(CONFIG_MACH_VENTURI)
-#if !defined(CONFIG_VENTURI_USA)
 		{
 			.gpio	= S5PV210_GPH3(0),
 			.code	= KEY_HOME,
 		},
-#endif
 		{
 			.gpio	= S5PV210_GPH3(1),
 			.code	= KEY_VOLUMEDOWN,
@@ -1464,37 +1463,80 @@ static struct gpio_event_direct_entry aries_keypad_key_map[] = {
 			.gpio	= S5PV210_GPH3(2),
 			.code	= KEY_VOLUMEUP,
 		}
-#endif
 };
 
-static struct gpio_event_input_info aries_keypad_key_info = {
+static struct gpio_event_direct_entry aries_keypad_key_map_usa[] = {
+		{
+			.gpio	= S5PV210_GPH2(6),
+			.code	= KEY_POWER,
+		},
+		{
+			.gpio	= S5PV210_GPH3(1),
+			.code	= KEY_VOLUMEDOWN,
+		},
+		{
+			.gpio	= S5PV210_GPH3(2),
+			.code	= KEY_VOLUMEUP,
+		}
+};
+
+static struct gpio_event_input_info aries_keypad_key_info_int = {
 	.info.func = gpio_event_input_func,
 	.info.no_suspend = true,
 	.debounce_time.tv64 = 5 * NSEC_PER_MSEC,
 	.type = EV_KEY,
-	.keymap = aries_keypad_key_map,
-	.keymap_size = ARRAY_SIZE(aries_keypad_key_map)
+	.keymap = aries_keypad_key_map_int,
+	.keymap_size = ARRAY_SIZE(aries_keypad_key_map_int)
 };
 
-static struct gpio_event_info *aries_input_info[] = {
-	&aries_keypad_key_info.info,
+static struct gpio_event_input_info aries_keypad_key_info_usa = {
+	.info.func = gpio_event_input_func,
+	.info.no_suspend = true,
+	.debounce_time.tv64 = 5 * NSEC_PER_MSEC,
+	.type = EV_KEY,
+	.keymap = aries_keypad_key_map_usa,
+	.keymap_size = ARRAY_SIZE(aries_keypad_key_map_usa)
+};
+
+static struct gpio_event_info *aries_input_info_int[] = {
+	&aries_keypad_key_info_int.info,
+};
+static struct gpio_event_info *aries_input_info_usa[] = {
+	&aries_keypad_key_info_usa.info,
 };
 
 
-static struct gpio_event_platform_data aries_input_data = {
+static struct gpio_event_platform_data aries_input_data_int = {
 	.names = {
 		"s3c-keypad",
 		NULL,
 	},
-	.info = aries_input_info,
-	.info_count = ARRAY_SIZE(aries_input_info),
+	.info = aries_input_info_int,
+	.info_count = ARRAY_SIZE(aries_input_info_int),
 };
 
-static struct platform_device aries_input_device = {
+static struct gpio_event_platform_data aries_input_data_usa = {
+	.names = {
+		"s3c-keypad",
+		NULL,
+	},
+	.info = aries_input_info_usa,
+	.info_count = ARRAY_SIZE(aries_input_info_usa),
+};
+
+static struct platform_device aries_input_device_int = {
 	.name = GPIO_EVENT_DEV_NAME,
 	.id = 0,
 	.dev = {
-		.platform_data = &aries_input_data,
+		.platform_data = &aries_input_data_int,
+	},
+};
+
+static struct platform_device aries_input_device_usa = {
+	.name = GPIO_EVENT_DEV_NAME,
+	.id = 0,
+	.dev = {
+		.platform_data = &aries_input_data_usa,
 	},
 };
 
@@ -4523,7 +4565,7 @@ static struct platform_device *aries_devices[] __initdata = {
 #ifdef CONFIG_RTC_DRV_S3C
 	&s5p_device_rtc,
 #endif
-	&aries_input_device,
+//	&aries_input_device,
 //	&s3c_device_keypad,
 
 	&s5pv210_device_iis0,
@@ -4786,6 +4828,18 @@ static void __init onenand_init()
 	BUG_ON(!clk);
 	clk_enable(clk);
 }
+
+static int set_variant_code(const char *val, struct kernel_param *kp)
+{
+	param_set_charp(val, kp);
+	printk("%s: variant_code=%s\n",__func__,variant_code);
+	if(strcmp(variant_code, "XAA") == 0)
+		platform_device_register(&aries_input_device_usa);
+	else
+		platform_device_register(&aries_input_device_int);
+}
+
+module_param_call(variant_code, set_variant_code, param_get_charp, &variant_code, 0664);
 
 static void __init aries_machine_init(void)
 {
