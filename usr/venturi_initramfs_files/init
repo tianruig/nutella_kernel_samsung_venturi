@@ -13,12 +13,17 @@ exec >>/boot.txt 2>&1
 mount -t proc proc /proc
 mount -t sysfs sysfs /sys
 mount -t ext4 /dev/block/mmcblk0p15 /cache
+busybox mkdir /efs
+mount -t vfat /dev/block/mmcblk0p10 /efs
 
 #busybox date segfaults? so yeah.
 busybox cat /sys/devices/platform/s3c2410-rtc/rtc/rtc1/date
 busybox cat /sys/devices/platform/s3c2410-rtc/rtc/rtc1/time
 
 image=/stage1/boot.cpio
+
+# Set the wifi mac addr
+busybox printf "$(busybox cat /efs/imei/.nvmac.info)" > /sys/module/mach_venturi/parameters/wlan_mac
 
 if test -e /cache/.rebooting ; then
 
@@ -33,16 +38,22 @@ if test -e /cache/.startrecovery || grep -q bootmode=2 /proc/cmdline ; then
 	bzcat /stage1/param.bz2 | dd of=/dev/block/mmcblk0p9
 
 	rm -rf /cache/.startrecovery
-	image=/stage1/recovery.cpio
+
+	#load custom recovery ramdisk if it's there
+	if test -e /cache/custom_recovery/ramdisk-recovery.cpio ; then
+		image=/cache/custom_recovery/ramdisk-recovery.cpio
+	else
+		image=/stage1/recovery.cpio
+	fi
 
 	# disable lpm
 	echo 0 > /sys/class/power_supply/battery/charging_mode_booting
 fi
 
+cpio -i < ${image}
+
 umount /cache
 rm -rf /cache
-
-cpio -i < ${image}
 
 busybox cat /sys/class/power_supply/battery/charging_mode_booting
 
@@ -53,12 +64,13 @@ fi
 
 umount /sys
 umount /proc
+umount /efs
 
 mount -t vfat /dev/block/mmcblk0p17 /emmc
 busybox cat /boot.txt >> /emmc/boot.txt
 umount /emmc
 
-rm -rf /dev/* /stage1 /emmc
+rm -rf /dev/* /stage1 /emmc /efs
 
 export PATH="${_PATH}"
 
