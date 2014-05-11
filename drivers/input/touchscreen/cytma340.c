@@ -39,11 +39,8 @@
 #define TOUCH_DVFS_CONTROL 1
 
 #ifdef CYTSP_FWUPG_ENABLE
-#ifdef CONFIG_VENTURI_USA
 #include "cytma340_fw_usa.h"
-#else
 #include "cytma340_fw.h"
-#endif
 #endif
 
 #ifdef CONFIG_CPU_FREQ
@@ -62,7 +59,9 @@ enum driver_setup_t {DRIVER_SETUP_OK, DRIVER_SETUP_INCOMPLETE};
 
 static char * variant_code = "XAA";
 
-#define IS_USA (variant_code == "XAA")
+static bool initialized = false;
+
+static bool IS_USA = false;
 
 struct i2c_driver 			cytouch_i2c_driver;
 struct workqueue_struct 	*cytouch_wq = NULL;
@@ -295,9 +294,7 @@ typedef struct
 	u8 touch4_yh;	//22
 	u8 touch4_yl;	//23
 	u8 touch4_z;	//24    size = 25
-#ifdef CONFIG_VENTURI_USA
 	u8 vendor_id;	//25    size = 26
-#endif
 }__attribute__((packed))CYTOUCH_RAW_DATA;
 
 /********************** --Cypress ***********************************/
@@ -306,14 +303,11 @@ typedef struct
 #define TSP_RELEASE 				0
 #define TSP_INITIAL 				-1
 #define TSP_FORCED_RELEASE			-2
-#ifdef CONFIG_VENTURI_USA
-#define TSP_MENUKEY_PRESS			0x01
-#define TSP_HOMEKEY_PRESS			0x02
-#define TSP_BACKKEY_PRESS			0x04
-#else
-#define TSP_MENUKEY_PRESS			0x40
-#define TSP_BACKKEY_PRESS			0x80
-#endif
+#define TSP_MENUKEY_PRESS_USA			0x01
+#define TSP_HOMEKEY_PRESS_USA			0x02
+#define TSP_BACKKEY_PRESS_USA			0x04
+#define TSP_MENUKEY_PRESS_INT			0x40
+#define TSP_BACKKEY_PRESS_INT			0x80
 #define TOUCHKEY_KEYCODE_MENU		158
 #define TOUCHKEY_KEYCODE_BACK		28
 
@@ -334,7 +328,6 @@ static u64 g_menukey_start_time = 0;
 
 static int 	g_suspend_state = FALSE;
 
-#ifdef CONFIG_VENTURI_USA
 #ifdef TOUCHKEY_ENABLE
 #define TOUCHKEY_HOME			KEY_HOME
 #endif
@@ -347,7 +340,6 @@ static struct timer_list g_cytouch_homekey_timer;
 #endif
 static u64 g_homekey_start_time = 0;
 
-#endif
 
 #ifdef CYTSP_TIMER_ENABLE
 void cytouch_backkey_timer_body(struct work_struct* p_work)
@@ -452,7 +444,6 @@ static void cytouch_menukey_timer_handler(unsigned long data)
 	schedule_work(&cytouch_menukey_timer_wq);
 }
 
-#ifdef CONFIG_VENTURI_USA
 void cytouch_homekey_timer_body(struct work_struct* p_work)
 {
 	u8 buf = 0x0;
@@ -502,7 +493,6 @@ static void cytouch_homekey_timer_handler(unsigned long data)
 {
 	schedule_work(&cytouch_homekey_timer_wq);
 }
-#endif /* CONFIG_VENTURI_USA */
 
 void cytouch_touch_timer_body(struct work_struct* p_work)
 {
@@ -580,10 +570,11 @@ static void cytouch_init_rel_timer(void)
 	g_cytouch_backkey_timer.function = cytouch_backkey_timer_handler;
 	g_cytouch_menukey_timer.function = cytouch_menukey_timer_handler;
 	g_cytouch_touch_timer.function = cytouch_touch_timer_handler;
-#ifdef CONFIG_VENTURI_USA
-	init_timer(&g_cytouch_homekey_timer);
-	g_cytouch_homekey_timer.function = cytouch_homekey_timer_handler;
-#endif
+	if(IS_USA)
+	{
+		init_timer(&g_cytouch_homekey_timer);
+		g_cytouch_homekey_timer.function = cytouch_homekey_timer_handler;
+	}
 }
 #endif // --CYTSP_TIMER_ENABLE
 
@@ -614,18 +605,19 @@ void cytouch_release_all(void)
 
 	g_backkey_start_time = 0;
 	g_menukey_start_time = 0;
-#ifdef CONFIG_VENTURI_USA
+	if(IS_USA)
+	{
 #ifdef CYTSP_TIMER_ENABLE
-	del_timer(&g_cytouch_homekey_timer);
-	cancel_work_sync(&cytouch_homekey_timer_wq);
+		del_timer(&g_cytouch_homekey_timer);
+		cancel_work_sync(&cytouch_homekey_timer_wq);
 #endif
 
-	input_report_key(gp_cytouch_input, TOUCHKEY_HOME, 0);	// Home Key release 
+		input_report_key(gp_cytouch_input, TOUCHKEY_HOME, 0);	// Home Key release 
 
-	prev_home = TSP_RELEASE;
+		prev_home = TSP_RELEASE;
 
-	g_homekey_start_time = 0;
-#endif
+		g_homekey_start_time = 0;
+	}
 	/* check previous touch input and return RELEASE */
 	for (i = 0; i < CYTOUCH_MAX_ID+1; i++)
 	{
@@ -742,9 +734,7 @@ void  get_message(struct work_struct * p)
 #ifdef CYTSP_TIMER_ENABLE
 	int 			b_add_backkey_timer = FALSE;
 	int 			b_add_menukey_timer = FALSE;
-#ifdef CONFIG_VENTURI_USA
 	int 			b_add_homekey_timer = FALSE;
-#endif
 	int 			b_add_touch_timer 	= FALSE;
 #endif
 #ifdef CYTSP_HWRESET_LONGKEY // workaround code for Rossi
@@ -809,11 +799,11 @@ void  get_message(struct work_struct * p)
 	/*	parse Data
 	*/
 	num_of_touch 	= buf.tt_stat & 0x0F;	 // pressed finger count
-#ifdef CONFIG_VENTURI_USA
-	key 			= buf.vendor_id;	 // pressed key
-#else
-	key 			= buf.tt_stat & 0xC0;	 // pressed key
-#endif
+	if(IS_USA){
+		key 			= buf.vendor_id;	 // pressed key
+	}else{
+		key 			= buf.tt_stat & 0xC0;	 // pressed key
+	}
 	//if (checkTSPKEYdebuglevel != KERNEL_SEC_DEBUG_LEVEL_LOW)
 		//CYTSPDBG("num=%d,key=%d\n", num_of_touch, key);
 
@@ -834,14 +824,12 @@ void  get_message(struct work_struct * p)
 #ifdef CYTSP_TIMER_ENABLE
 	/*	delete timer
 	*/
-	if(key == TSP_MENUKEY_PRESS)
+	if(key == TSP_MENUKEY_PRESS_INT || key == TSP_MENUKEY_PRESS_USA)
 		del_timer(&g_cytouch_menukey_timer);
-	else if(key == TSP_BACKKEY_PRESS)
+	else if(key == TSP_BACKKEY_PRESS_INT || key == TSP_BACKKEY_PRESS_USA)
 		del_timer(&g_cytouch_backkey_timer);
-#ifdef CONFIG_VENTURI_USA
-	else if (key == TSP_HOMEKEY_PRESS)
+	else if (IS_USA && key == TSP_HOMEKEY_PRESS_USA)
 		del_timer(&g_cytouch_homekey_timer);
-#endif
 #endif
 
 	/*	parse Data
@@ -887,8 +875,7 @@ void  get_message(struct work_struct * p)
 			//CYTSPDBG("(%d,%d,%d,%d)\n", point[i].x, point[i].y, point[i].z, point[i].id);
 	}
 #if TOUCH_DVFS_CONTROL
-#ifdef CONFIG_VENTURI_USA
-	if (num_of_touch > 0) {
+	if (IS_USA && num_of_touch > 0) {
 		if(touch_state_val == 0)
 		{
 #ifdef CONFIG_METICULUS_SUSPENSION
@@ -900,8 +887,7 @@ void  get_message(struct work_struct * p)
 			touch_state_val = 1;
 		}
 	}
-#else
-	if(point[0].id == 1)
+	if(!IS_USA && point[0].id == 1)
 	{
 		// first touch pressed!
 		if(touch_state_val == 0)
@@ -916,7 +902,6 @@ void  get_message(struct work_struct * p)
 		}
 	}
 #endif
-#endif
 	//CYTSPDBG("num_of_touch=%d, key=0x%x, TOUCH12_ID=0x%x\n", num_of_touch, key, buf.touch12_id);
 
 
@@ -924,14 +909,11 @@ void  get_message(struct work_struct * p)
 	/*		Touch Key	Processing							     */
 	/***********************************************************/
 
-	if(key == TSP_MENUKEY_PRESS)
+	if(key == TSP_MENUKEY_PRESS_INT || key == TSP_MENUKEY_PRESS_USA)
 	{
 		// MenuKey pressed
-#ifdef CONFIG_VENTURI_USA
-		if((prev_back != TSP_PRESSED) && (prev_menu != TSP_PRESSED) && (prev_home != TSP_PRESSED))
-#else
-		if((prev_back != TSP_PRESSED) && (prev_menu != TSP_PRESSED))
-#endif
+		if((!IS_USA && ((prev_back != TSP_PRESSED) && (prev_menu != TSP_PRESSED))) || 
+		(IS_USA && ((prev_back != TSP_PRESSED) && (prev_menu != TSP_PRESSED) && (prev_home != TSP_PRESSED))))
 		{
 			//if (checkTSPKEYdebuglevel != KERNEL_SEC_DEBUG_LEVEL_LOW)
 			//	CYTSPDBG("%s : MENU DOWN\n", __func__);
@@ -971,14 +953,11 @@ void  get_message(struct work_struct * p)
 		}
 #endif
 	}
-	else if(key == TSP_BACKKEY_PRESS)
+	else if(key == TSP_BACKKEY_PRESS_INT || key == TSP_BACKKEY_PRESS_USA)
 	{
 		// BackKey pressed
-#ifdef CONFIG_VENTURI_USA
-		if((prev_back != TSP_PRESSED) && (prev_menu != TSP_PRESSED) && (prev_home != TSP_PRESSED))
-#else
-		if((prev_back != TSP_PRESSED) && (prev_menu != TSP_PRESSED))
-#endif
+		if((!IS_USA && ((prev_back != TSP_PRESSED) && (prev_menu != TSP_PRESSED))) || 
+		(IS_USA && ((prev_back != TSP_PRESSED) && (prev_menu != TSP_PRESSED) && (prev_home != TSP_PRESSED))))
 		{
 			//if (checkTSPKEYdebuglevel != KERNEL_SEC_DEBUG_LEVEL_LOW)
 			//	CYTSPDBG("%s : BACK DOWN\n", __func__);
@@ -1016,8 +995,7 @@ void  get_message(struct work_struct * p)
 		}
 #endif
 	}
-#ifdef CONFIG_VENTURI_USA
-	else if(key == TSP_HOMEKEY_PRESS)
+	else if(IS_USA && key == TSP_HOMEKEY_PRESS_USA)
 	{
 		// HomeKey pressed
 		if((prev_back != TSP_PRESSED) && (prev_menu != TSP_PRESSED) && (prev_home != TSP_PRESSED))
@@ -1045,12 +1023,8 @@ void  get_message(struct work_struct * p)
 #endif
 		}
 	}
-#endif
-#ifdef CONFIG_VENTURI_USA
-	else if(key == (TSP_MENUKEY_PRESS | TSP_BACKKEY_PRESS | TSP_HOMEKEY_PRESS))
-#else
-	else if(key == (TSP_MENUKEY_PRESS | TSP_BACKKEY_PRESS))
-#endif
+	else if((IS_USA && (key == (TSP_MENUKEY_PRESS_USA | TSP_BACKKEY_PRESS_USA | TSP_HOMEKEY_PRESS_USA))) ||
+	(!IS_USA && (key == (TSP_MENUKEY_PRESS_INT | TSP_BACKKEY_PRESS_INT))))
 	{
 		// both Key pressed, Not Supported
 		;
@@ -1093,8 +1067,7 @@ void  get_message(struct work_struct * p)
 			//if (checkTSPKEYdebuglevel != KERNEL_SEC_DEBUG_LEVEL_LOW)
 			//	CYTSPDBG("%s : BACK UP\n", __func__);
 		}
-#ifdef CONFIG_VENTURI_USA
-		else if(prev_home == TSP_PRESSED)
+		else if(IS_USA && (prev_home == TSP_PRESSED))
 		{
 			input_report_key(gp_cytouch_input, TOUCHKEY_HOME, 0);
 			input_sync(gp_cytouch_input);
@@ -1111,7 +1084,6 @@ void  get_message(struct work_struct * p)
 			//if (checkTSPKEYdebuglevel != KERNEL_SEC_DEBUG_LEVEL_LOW)
 			//	CYTSPDBG("%s : HOME UP\n", __func__);
 		}
-#endif
 	}
 #ifdef CYTSP_HWRESET_LONGKEY
 	if (b_menukey_reset == TRUE || b_backkey_reset == TRUE)
@@ -1149,13 +1121,11 @@ void  get_message(struct work_struct * p)
 		g_cytouch_menukey_timer.expires = get_jiffies_64() + msecs_to_jiffies(40);
 		add_timer(&g_cytouch_menukey_timer);
 	}
-#ifdef CONFIG_VENTURI_USA
-	if (TRUE == b_add_homekey_timer)
+	if (IS_USA && (TRUE == b_add_homekey_timer))
 	{
 		g_cytouch_homekey_timer.expires = get_jiffies_64() + msecs_to_jiffies(40);
 		add_timer(&g_cytouch_homekey_timer);
 	}
-#endif
 #endif
 
 	/***********************************************************/
@@ -1258,8 +1228,7 @@ void  get_message(struct work_struct * p)
 				g_cytouch_id_stat[i].status = CYTOUCH_ID_STAT_RELEASED;
 				input_mt_sync(gp_cytouch_input);
 #if TOUCH_DVFS_CONTROL
-#ifndef CONFIG_VENTURI_USA
-				if(i == 1)
+				if(!IS_USA && (i == 1))
 				{
 					// first touch released!
 					if(touch_state_val == 1)
@@ -1270,7 +1239,6 @@ void  get_message(struct work_struct * p)
 					}
 				}
 #endif
-#endif
 			}
 		}
 
@@ -1280,15 +1248,13 @@ void  get_message(struct work_struct * p)
 	input_sync(gp_cytouch_input);
 
 #if TOUCH_DVFS_CONTROL
-#ifdef CONFIG_VENTURI_USA
-	if (num_of_touch == 0) {
+	if (IS_USA && (num_of_touch == 0)) {
 		if(touch_state_val == 1) {
 			s5pv210_unlock_dvfs_high_level(DVFS_LOCK_TOKEN_7);
 			resume_dvfs_lock = false;
 			touch_state_val = 0;
 		}
 	}
-#endif
 #endif
 
 #ifdef CYTSP_TIMER_ENABLE
@@ -1401,8 +1367,10 @@ static ssize_t set_qt_update_show(struct device *dev, struct device_attribute *a
 
 static ssize_t set_qt_firm_version_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-
-	return sprintf(buf, "%d\n", cytma340_new_fw_ver);
+	if(IS_USA)
+		return sprintf(buf, "%d\n", cytma340_new_fw_ver_usa);
+	else
+		return sprintf(buf, "%d\n", cytma340_new_fw_ver_int);
 
 }
 
@@ -1557,9 +1525,9 @@ void cytouch_set_input_dev(void)
 
 	set_bit(TOUCHKEY_MENU, gp_cytouch_input->keybit);
 	set_bit(TOUCHKEY_BACK, gp_cytouch_input->keybit);
-#ifdef CONFIG_VENTURI_USA
-	set_bit(TOUCHKEY_HOME, gp_cytouch_input->keybit);
-#endif
+	if(IS_USA)
+		set_bit(TOUCHKEY_HOME, gp_cytouch_input->keybit);
+
 
 	input_set_abs_params(gp_cytouch_input, ABS_X, 0, 479, 0, 0);
 	input_set_abs_params(gp_cytouch_input, ABS_Y, 0, 799, 0, 0);
@@ -1808,26 +1776,31 @@ static int cytouch_upgrade_fw(void)
 {
 	if( (g_vendor_id | g_module_id | g_fw_ver) != 0 )
 	{
-		if(g_vendor_id != cytma340_new_vendor_id)
+		if(g_vendor_id != cytma340_new_vendor_id_int || g_vendor_id != cytma340_new_vendor_id_usa)
 		{
-			CYTSPDBG("vendor is invalid (%d, %d)\n", g_vendor_id, cytma340_new_vendor_id);
+			CYTSPDBG("vendor is invalid (%d, %d, %d)\n", 
+				g_vendor_id, cytma340_new_vendor_id_int,cytma340_new_vendor_id_usa);
 			return -1;
 		}
 
-		if(g_module_id != cytma340_new_module_id)
+		if(g_module_id != cytma340_new_module_id_int || g_module_id != cytma340_new_module_id_usa)
 		{
-			CYTSPDBG("module_id is invalid (%d, %d)\n", g_module_id, cytma340_new_module_id);
+			CYTSPDBG("module_id is invalid (%d, %d, %d)\n", 
+				g_module_id, cytma340_new_module_id_int, cytma340_new_module_id_usa );
 			return -1;
 		}
 
-		if(g_fw_ver >= cytma340_new_fw_ver)
+		if(g_fw_ver >= cytma340_new_fw_ver_int || g_fw_ver >= cytma340_new_fw_ver_usa)
 		{
-			CYTSPDBG("fw_ver is the latest version	(%d, %d)\n", g_fw_ver, cytma340_new_fw_ver);
+			CYTSPDBG("fw_ver is the latest version	(%d, %d, %d)\n", 
+				g_fw_ver, cytma340_new_fw_ver_int, cytma340_new_fw_ver_usa);
 			return 0;
 		}
 	}
-
-	CYTSPDBG("%s : Firmware Upgrade (%d -> %d)\n", __func__, g_fw_ver, cytma340_new_fw_ver);
+	if(IS_USA)
+		CYTSPDBG("%s : Firmware Upgrade (%d -> %d)\n", __func__, g_fw_ver, cytma340_new_fw_ver_usa);
+	else
+		CYTSPDBG("%s : Firmware Upgrade (%d -> %d)\n", __func__, g_fw_ver, cytma340_new_fw_ver_int);
 
 	// clear i2c gpio setting
 	s3c_gpio_cfgpin(GPIO_TSP_SDA_28V, S3C_GPIO_INPUT);
@@ -1846,9 +1819,19 @@ static int cytouch_upgrade_fw(void)
 	}
 
 	/* update version info.. */
-	g_vendor_id = cytma340_new_vendor_id;
-	g_module_id = cytma340_new_module_id;
-	g_fw_ver = cytma340_new_fw_ver;
+	if(IS_USA)
+	{
+		g_vendor_id = cytma340_new_vendor_id_usa;
+		g_module_id = cytma340_new_module_id_usa;
+		g_fw_ver = cytma340_new_fw_ver_usa;
+	}
+	else
+	{
+		g_vendor_id = cytma340_new_vendor_id_int;
+		g_module_id = cytma340_new_module_id_int;
+		g_fw_ver = cytma340_new_fw_ver_int;
+	}
+
 	tsp_version = g_fw_ver;
 
 	/* reset */
@@ -1898,9 +1881,19 @@ static int cytouch_upgrade_fw_force(void)
 	}
 
 	/* update version info.. */
-	g_vendor_id = cytma340_new_vendor_id;
-	g_module_id = cytma340_new_module_id;
-	g_fw_ver = cytma340_new_fw_ver;
+	if(IS_USA)
+	{
+		g_vendor_id = cytma340_new_vendor_id_usa;
+		g_module_id = cytma340_new_module_id_usa;
+		g_fw_ver = cytma340_new_fw_ver_usa;
+	}
+	else
+	{
+		g_vendor_id = cytma340_new_vendor_id_int;
+		g_module_id = cytma340_new_module_id_int;
+		g_fw_ver = cytma340_new_fw_ver_int;
+	}
+
 	tsp_version = g_fw_ver;
 
 	/* reset */
@@ -2165,10 +2158,20 @@ void __exit cytouch_exit(void)
 
 static int set_variant_code(const char *val, struct kernel_param *kp)
 {
+	/* only init once */
+	if(initialized) return 0;
+
+	initialized = true;
 	param_set_charp(val, kp);
+	if(strcmp(variant_code, "XAA") == 0)
+		IS_USA = true;
+	else
+		IS_USA = false;
+
 	printk("%s: variant_code=%s\n",__func__,variant_code);
 
 	cytouch_init();
+	return 0;
 }
 
 module_param_call(variant_code, set_variant_code, param_get_charp, &variant_code, 0664);
@@ -4191,7 +4194,10 @@ UInt16 load_tma340_frimware_data(void)
 
 		for(onelinelength=0; onelinelength<64; onelinelength++)
 		{
-			firmData[firmwareline][onelinelength] = make2ChTo1(temp_onelinedata[i], temp_onelinedata[i+1]);
+			if(IS_USA)
+				firmData_usa[firmwareline][onelinelength] = make2ChTo1(temp_onelinedata[i], temp_onelinedata[i+1]);
+			else
+				firmData_int[firmwareline][onelinelength] = make2ChTo1(temp_onelinedata[i], temp_onelinedata[i+1]);
 			i += 2;
 		}
 	}
@@ -4297,11 +4303,17 @@ int tma340_frimware_update(void)
 			{
 				if(i<64)
 				{
-					abTargetDataOUT[i] = firmData[aIndex][i];
+					if(IS_USA)
+						abTargetDataOUT[i] = firmData_usa[aIndex][i];
+					else
+						abTargetDataOUT[i] = firmData_int[aIndex][i];
 				}
 				else
 				{
-					abTargetDataOUT[i] = firmData[aIndex+1][i-64];
+					if(IS_USA)
+						abTargetDataOUT[i] = firmData_usa[aIndex+1][i-64];
+					else
+						abTargetDataOUT[i] = firmData_int[aIndex+1][i-64];
 				}
 			}
 
@@ -4358,11 +4370,17 @@ int tma340_frimware_update(void)
 			{
 				if(i<64)
 				{
-					abTargetDataOUT[i] = firmData[aIndex][i];
+					if(IS_USA)
+						abTargetDataOUT[i] = firmData_usa[aIndex][i];
+					else
+						abTargetDataOUT[i] = firmData_int[aIndex][i];
 				}
 				else
 				{
-					abTargetDataOUT[i] = firmData[aIndex+1][i-64];
+					if(IS_USA)
+						abTargetDataOUT[i] = firmData_usa[aIndex+1][i-64];
+					else
+						abTargetDataOUT[i] = firmData_int[aIndex+1][i-64];
 				}
 			}
 

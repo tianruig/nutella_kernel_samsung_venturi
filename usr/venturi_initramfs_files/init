@@ -28,6 +28,9 @@ busybox printf "$(busybox cat /efs/imei/.nvmac.info)" > /sys/module/mach_venturi
 # Set the buyer code (registers input keys)
 busybox printf "$(busybox cat /efs/buyer_code.dat)" > /sys/module/mach_venturi/parameters/variant_code
 
+# Set the buyer code (init input/touchscreen driver)
+busybox printf "$(busybox cat /efs/buyer_code.dat)" > /sys/module/cytma340/parameters/variant_code
+
 if test -e /cache/.rebooting ; then
 
 	rm -rf /cache/.rebooting
