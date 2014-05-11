@@ -60,7 +60,9 @@ static	void	__iomem		*gpio_pend_mask_mem;
 
 enum driver_setup_t {DRIVER_SETUP_OK, DRIVER_SETUP_INCOMPLETE};
 
+static char * variant_code = "XAA";
 
+#define IS_USA (variant_code == "XAA")
 
 struct i2c_driver 			cytouch_i2c_driver;
 struct workqueue_struct 	*cytouch_wq = NULL;
@@ -2064,7 +2066,7 @@ struct device *ts_dev;
 * ***************************************************************************/
 
 
-int __init cytouch_init(void)
+int cytouch_init(void)
 {
 	int ret;
 
@@ -2160,7 +2162,18 @@ void __exit cytouch_exit(void)
 	if (cytouch_wq)
 		destroy_workqueue(cytouch_wq);
 }
-late_initcall(cytouch_init);
+
+static int set_variant_code(const char *val, struct kernel_param *kp)
+{
+	param_set_charp(val, kp);
+	printk("%s: variant_code=%s\n",__func__,variant_code);
+
+	cytouch_init();
+}
+
+module_param_call(variant_code, set_variant_code, param_get_charp, &variant_code, 0664);
+
+//late_initcall(cytouch_init);
 module_exit(cytouch_exit);
 
 MODULE_DESCRIPTION("Quantum Touchscreen Driver");
