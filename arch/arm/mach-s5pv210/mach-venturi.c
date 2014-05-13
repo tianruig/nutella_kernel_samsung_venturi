@@ -4833,7 +4833,7 @@ static int set_variant_code(const char *val, struct kernel_param *kp)
 {
 	param_set_charp(val, kp);
 	printk("%s: variant_code=%s\n",__func__,variant_code);
-	if(strcmp(variant_code, "XAA") == 0)
+	if(strcmp(variant_code, "XAA") == 0 || strcmp(variant_code, "XAC") == 0)
 		platform_device_register(&aries_input_device_usa);
 	else
 		platform_device_register(&aries_input_device_int);

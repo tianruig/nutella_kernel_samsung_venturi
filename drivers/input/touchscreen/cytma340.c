@@ -2163,7 +2163,7 @@ static int set_variant_code(const char *val, struct kernel_param *kp)
 
 	initialized = true;
 	param_set_charp(val, kp);
-	if(strcmp(variant_code, "XAA") == 0)
+	if(strcmp(variant_code, "XAA") == 0 || strcmp(variant_code, "XAC") == 0)
 		IS_USA = true;
 	else
 		IS_USA = false;
