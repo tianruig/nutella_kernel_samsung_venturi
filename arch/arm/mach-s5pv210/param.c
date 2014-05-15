@@ -65,6 +65,8 @@ don't see the point. */
 
 static int reboot_mode = 0;
 
+static bool manual_mode = false;
+
 static int write_int(int offset, void *value)
 {
 	struct file *filp;
@@ -138,7 +140,7 @@ void sec_set_param_value(int idx, void *value)
 {
 	printk("%s: idx=%d value=%d\n", __func__,idx, *(int *)value);
 
-	if(idx == __REBOOT_MODE)
+	if(idx == __REBOOT_MODE && !manual_mode)
 		write_int(REBOOT_MODE_OFFSET, value);
 }
 
@@ -150,19 +152,19 @@ void sec_get_param_value(int idx, void *value)
 static int set_reboot_mode(const char *val, struct kernel_param *kp)
 {
 	param_set_int(val,kp);
-	sec_set_param_value(__REBOOT_MODE, &reboot_mode);
+	manual_mode = true;
+	write_int(REBOOT_MODE_OFFSET, &reboot_mode);
 
-	return 0;
-}
-
-static int get_reboot_mode(const char *val, struct kernel_param *kp)
-{
 	reboot_mode = read_int(REBOOT_MODE_OFFSET);
 
 	return 0;
 }
 
+module_param(manual_mode, bool, 0664);
+MODULE_PARM_DESC(manual_mode, "If true, does not process system requests.");
+
 module_param_call(reboot_mode, set_reboot_mode, param_get_int, &reboot_mode, 0664);
+MODULE_PARM_DESC(reboot_mode, "Sets the reboot mode. Automatically enables manual_mode.");
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR(DRIVER_AUTHOR);	
