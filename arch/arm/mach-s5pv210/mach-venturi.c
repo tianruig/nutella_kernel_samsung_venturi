@@ -148,11 +148,11 @@ EXPORT_SYMBOL(gps_dev);
 unsigned int HWREV =0;
 EXPORT_SYMBOL(HWREV);
 
-void (*sec_set_param_value)(int idx, void *value);
+/*void (*sec_set_param_value)(int idx, void *value);
 EXPORT_SYMBOL(sec_set_param_value);
 
 void (*sec_get_param_value)(int idx, void *value);
-EXPORT_SYMBOL(sec_get_param_value);
+EXPORT_SYMBOL(sec_get_param_value); */
 
 #define KERNEL_REBOOT_MASK      0xFFFFFFFF
 #define REBOOT_MODE_FAST_BOOT		7
