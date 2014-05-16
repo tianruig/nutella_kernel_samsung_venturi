@@ -192,7 +192,7 @@ static int aries_notifier_call(struct notifier_block *this,
 		else if (!strcmp((char *)_cmd, "recovery"))
 			mode = REBOOT_MODE_RECOVERY;
 		else if (!strcmp((char *)_cmd, "bootloader"))
-			mode = REBOOT_MODE_FAST_BOOT;
+			mode = REBOOT_MODE_DOWNLOAD;
 		else if (!strcmp((char *)_cmd, "download"))
 			mode = REBOOT_MODE_DOWNLOAD;
 		else
