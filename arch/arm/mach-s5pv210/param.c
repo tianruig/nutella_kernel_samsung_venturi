@@ -160,6 +160,14 @@ static int set_reboot_mode(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
+static int __init param_init(void)
+{
+	reboot_mode = read_int(REBOOT_MODE_OFFSET);
+	return 0;
+}
+
+late_initcall(param_init);
+
 module_param(manual_mode, bool, 0664);
 MODULE_PARM_DESC(manual_mode, "If true, does not process system requests.");
 
