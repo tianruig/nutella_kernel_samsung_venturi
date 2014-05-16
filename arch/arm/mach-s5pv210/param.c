@@ -89,9 +89,9 @@ static int write_int(int offset, void *value)
 	
 	filp->f_flags |= O_NONBLOCK;
 	ret = filp->f_op->llseek(filp, offset, SEEK_SET);
-	if(ret) printk("seek error");
+	if(ret < 0) printk("PARAM: seek error");
 	ret = filp->f_op->write(filp, buffer, sizeof(int), &filp->f_pos);
-	if(ret) printk("write error");
+	if(ret < 0) printk("PARAM: write error");
 	filp->f_flags &= ~O_NONBLOCK;
 	
 	set_fs(fs);
@@ -123,9 +123,9 @@ static int read_int(int offset)
 	
 	filp->f_flags |= O_NONBLOCK;
 	err = filp->f_op->llseek(filp, offset, SEEK_SET);
-	if(err) printk("seek error");
+	if(err < 0) printk("PARAM: seek error");
 	err = filp->f_op->read(filp, buffer, sizeof(int), &filp->f_pos);
-	if(err) printk("read error");
+	if(err < 0) printk("PARAM: read error");
 	filp->f_flags &= ~O_NONBLOCK;
 	
 	set_fs(fs);
