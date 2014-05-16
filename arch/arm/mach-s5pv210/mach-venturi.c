@@ -182,7 +182,7 @@ struct wifi_mem_prealloc {
 static int aries_notifier_call(struct notifier_block *this,
 					unsigned long code, void *_cmd)
 {
-	int mode = REBOOT_MODE_NONE;
+	int mode = REBOOT_MODE_REBOOTING;
 
 	if ((code == SYS_RESTART) && _cmd) {
 		if (!strcmp((char *)_cmd, "arm11_fota"))
@@ -196,9 +196,16 @@ static int aries_notifier_call(struct notifier_block *this,
 		else if (!strcmp((char *)_cmd, "download"))
 			mode = REBOOT_MODE_DOWNLOAD;
 		else
-			mode = REBOOT_MODE_NONE;
+			mode = REBOOT_MODE_REBOOTING;
 	}
 	if (code != SYS_POWER_OFF) {
+		if (sec_set_param_value) {
+			sec_set_param_value(__REBOOT_MODE, &mode);
+		}
+	}
+	else 
+	{
+		mode = REBOOT_MODE_NONE;
 		if (sec_set_param_value) {
 			sec_set_param_value(__REBOOT_MODE, &mode);
 		}
