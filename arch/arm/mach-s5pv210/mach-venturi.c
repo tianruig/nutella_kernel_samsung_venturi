@@ -148,11 +148,11 @@ EXPORT_SYMBOL(gps_dev);
 unsigned int HWREV =0;
 EXPORT_SYMBOL(HWREV);
 
-void (*sec_set_param_value)(int idx, void *value);
+/*void (*sec_set_param_value)(int idx, void *value);
 EXPORT_SYMBOL(sec_set_param_value);
 
 void (*sec_get_param_value)(int idx, void *value);
-EXPORT_SYMBOL(sec_get_param_value);
+EXPORT_SYMBOL(sec_get_param_value); */
 
 #define KERNEL_REBOOT_MASK      0xFFFFFFFF
 #define REBOOT_MODE_FAST_BOOT		7
@@ -182,7 +182,7 @@ struct wifi_mem_prealloc {
 static int aries_notifier_call(struct notifier_block *this,
 					unsigned long code, void *_cmd)
 {
-	int mode = REBOOT_MODE_NONE;
+	int mode = REBOOT_MODE_REBOOTING;
 
 	if ((code == SYS_RESTART) && _cmd) {
 		if (!strcmp((char *)_cmd, "arm11_fota"))
@@ -192,13 +192,20 @@ static int aries_notifier_call(struct notifier_block *this,
 		else if (!strcmp((char *)_cmd, "recovery"))
 			mode = REBOOT_MODE_RECOVERY;
 		else if (!strcmp((char *)_cmd, "bootloader"))
-			mode = REBOOT_MODE_FAST_BOOT;
+			mode = REBOOT_MODE_DOWNLOAD;
 		else if (!strcmp((char *)_cmd, "download"))
 			mode = REBOOT_MODE_DOWNLOAD;
 		else
-			mode = REBOOT_MODE_NONE;
+			mode = REBOOT_MODE_REBOOTING;
 	}
 	if (code != SYS_POWER_OFF) {
+		if (sec_set_param_value) {
+			sec_set_param_value(__REBOOT_MODE, &mode);
+		}
+	}
+	else 
+	{
+		mode = REBOOT_MODE_NONE;
 		if (sec_set_param_value) {
 			sec_set_param_value(__REBOOT_MODE, &mode);
 		}

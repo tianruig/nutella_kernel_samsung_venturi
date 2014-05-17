@@ -75,13 +75,14 @@ typedef struct {
 /* REBOOT_MODE */
 #define REBOOT_MODE_NONE		0
 #define REBOOT_MODE_DOWNLOAD		1
+#define REBOOT_MODE_REBOOTING		2
 #define REBOOT_MODE_CHARGING		3
 #define REBOOT_MODE_RECOVERY		4
 #define REBOOT_MODE_ARM11_FOTA		5
 #define REBOOT_MODE_ARM9_FOTA		6
 
-extern void (*sec_set_param_value)(int idx, void *value);
-extern void (*sec_get_param_value)(int idx, void *value);
+void sec_set_param_value(int idx, void *value);
+void sec_get_param_value(int idx, void *value);
 
 #define USB_SEL_MASK	(1 << 0)
 #define UART_SEL_MASK	(1 << 1)
