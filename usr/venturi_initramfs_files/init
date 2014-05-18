@@ -22,13 +22,22 @@ busybox cat /sys/devices/platform/s3c2410-rtc/rtc/rtc1/time
 image=/stage1/boot.cpio
 
 # Set the wifi mac addr
-busybox printf "$(busybox cat /efs/imei/.nvmac.info)" > /sys/module/mach_venturi/parameters/wlan_mac
+if test -e /efs/imei/.nvmac.info; then
+	busybox printf "$(busybox cat /efs/imei/.nvmac.info)" > /sys/module/mach_venturi/parameters/wlan_mac
+else
+	busybox printf "00:00:00:00:00:00" > /sys/module/mach_venturi/parameters/wlan_mac
+fi
 
-# Set the buyer code (registers input keys)
-busybox printf "$(busybox cat /efs/buyer_code.dat)" > /sys/module/mach_venturi/parameters/variant_code
+if test -e /efs/buyer_code.dat; then
+	# Set the buyer code (registers input keys)
+	busybox printf "$(busybox cat /efs/buyer_code.dat)" > /sys/module/mach_venturi/parameters/variant_code
 
-# Set the buyer code (init input/touchscreen driver)
-busybox printf "$(busybox cat /efs/buyer_code.dat)" > /sys/module/cytma340/parameters/variant_code
+	# Set the buyer code (init input/touchscreen driver)
+	busybox printf "$(busybox cat /efs/buyer_code.dat)" > /sys/module/cytma340/parameters/variant_code
+else
+	busybox printf "ERR" > /sys/module/mach_venturi/parameters/variant_code
+	busybox printf "ERR" > /sys/module/cytma340/parameters/variant_code
+fi
 
 # Reboot check
 if test $(busybox cat /sys/module/param/parameters/reboot_mode) == 2 ; then
