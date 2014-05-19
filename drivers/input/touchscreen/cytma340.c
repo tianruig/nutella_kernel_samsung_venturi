@@ -27,6 +27,8 @@
 #include <linux/workqueue.h>
 #include <plat/regs-watchdog.h>
 
+#include <linux/leds.h>
+
 /*
  *	Operation Features
  */
@@ -2049,6 +2051,38 @@ void init_hw_setting(void)
 extern struct class *sec_class;
 struct device *ts_dev;
 
+static bool key_lights = false;
+
+static enum led_brightness cytma340_led_get_brightness(struct led_classdev *led_cdev)
+{
+	if(key_lights) return LED_OFF;
+	else return LED_FULL;
+}
+static void cytma340_led_set_brightness(struct led_classdev *led_cdev, enum led_brightness brightness)
+{
+	if((int)brightness)
+	{
+		touchkey_control(1);
+		led_power_control(1);
+		key_lights = true;
+	}
+	else
+	{
+		touchkey_control(2);
+		led_power_control(0);
+		key_lights = false;
+	}
+}
+
+static struct led_classdev cytma340_led_classdev = {
+	.name		= "button-backlight",
+	.brightness	= 0,
+	.max_brightness = 255,
+	.flags		= 0,
+	.brightness_set = cytma340_led_set_brightness,
+	.brightness_get = cytma340_led_get_brightness,
+};
+
 /*****************************************************************************
 *
 *  FUNCTION
@@ -2146,6 +2180,8 @@ int cytouch_init(void)
 #endif
 	/*------------------------------	 AT COMMAND TEST 		---------------------*/
 
+	led_classdev_register(ts_dev, &cytma340_led_classdev);
+
 	return 0;
 }
 
@@ -2174,9 +2210,7 @@ static int set_variant_code(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
-static bool key_lights = false;
-
-static bool set_key_lights(const char * val, struct kernel_param *kp)
+static int set_key_lights(const char * val, struct kernel_param *kp)
 {
 	param_set_bool(val, kp);
 	if(key_lights)
@@ -2189,6 +2223,7 @@ static bool set_key_lights(const char * val, struct kernel_param *kp)
 		touchkey_control(2);
 		led_power_control(0);
 	}
+	return 0;
 }
 
 module_param_call(key_lights, set_key_lights, param_get_bool, &key_lights, 0664);
