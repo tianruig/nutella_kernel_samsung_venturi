@@ -25,6 +25,7 @@
 #include <linux/spi/spi.h>
 #include <linux/lcd.h>
 #include <linux/backlight.h>
+#include <linux/leds.h>
 
 #include <plat/gpio-cfg.h>
 
@@ -109,7 +110,7 @@ static unsigned short brightness_setting_table[] = {
 struct s5p_lcd {
 	struct spi_device 			*g_spi;
 	struct lcd_device 			*lcd_dev;
-	struct backlight_device 	*bl_dev;
+	struct backlight_device 		*bl_dev;
 	struct early_suspend    early_suspend;
 };
 
@@ -694,6 +695,27 @@ static int s5p_bl_get_brightness(struct backlight_device* bd)
 	return bd_brightness;
 }
 
+static enum led_brightness s5p_led_get_brightness(struct led_classdev *led_cdev)
+{
+	if(!bd_brightness) return LED_OFF;
+	else if(bd_brightness < 255) return LED_HALF;
+	else return LED_FULL;
+}
+static void s5p_led_set_brightness(struct led_classdev *led_cdev, enum led_brightness brightness)
+{
+	update_brightness((int)brightness);
+}
+
+static struct led_classdev s5p_led_classdev = {
+	.name		= "lcd_backlight",
+	.brightness	= 0,
+	.max_brightness = 255,
+	.flags		= 0,
+	.brightness_set = s5p_led_set_brightness,
+	.brightness_get = s5p_led_get_brightness,
+};
+
+
 static struct backlight_ops s5p_bl_ops = {
 	.update_status = s5p_bl_update_status,
 	.get_brightness = s5p_bl_get_brightness,
@@ -727,6 +749,8 @@ static int __init hx8396_probe(struct spi_device *spi)
 	lcd.bl_dev = backlight_device_register("s5p_bl",&spi->dev,&lcd,&s5p_bl_ops,NULL);
 	lcd.bl_dev->props.max_brightness = 255;
 	dev_set_drvdata(&spi->dev,&lcd);
+
+	led_classdev_register(&spi->dev, &s5p_led_classdev);
 
 	SetLDIEnabledFlag(1);
 
