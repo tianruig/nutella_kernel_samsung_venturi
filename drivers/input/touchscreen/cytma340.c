@@ -2174,6 +2174,25 @@ static int set_variant_code(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
+static bool key_lights = false;
+
+static bool set_key_lights(const char * val, struct kernel_param *kp)
+{
+	param_set_bool(val, kp);
+	if(key_lights)
+	{
+		touchkey_control(1);
+		led_power_control(1);
+	}
+	else
+	{
+		touchkey_control(2);
+		led_power_control(0);
+	}
+}
+
+module_param_call(key_lights, set_key_lights, param_get_bool, &key_lights, 0664);
+
 module_param_call(variant_code, set_variant_code, param_get_charp, &variant_code, 0664);
 
 //late_initcall(cytouch_init);
