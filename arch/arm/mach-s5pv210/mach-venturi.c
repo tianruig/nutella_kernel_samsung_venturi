@@ -199,16 +199,12 @@ static int aries_notifier_call(struct notifier_block *this,
 			mode = REBOOT_MODE_REBOOTING;
 	}
 	if (code != SYS_POWER_OFF) {
-		if (sec_set_param_value) {
-			sec_set_param_value(__REBOOT_MODE, &mode);
-		}
+		sec_set_param_value(__REBOOT_MODE, &mode);
 	}
 	else 
 	{
 		mode = REBOOT_MODE_NONE;
-		if (sec_set_param_value) {
-			sec_set_param_value(__REBOOT_MODE, &mode);
-		}
+		sec_set_param_value(__REBOOT_MODE, &mode);
 	}
 
 	return NOTIFY_DONE;
@@ -349,10 +345,10 @@ static struct s3cfb_lcd hx8369 = {
 	},
 };
 
-#define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC0 (12288 * SZ_1K)
+#define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC0 (5550 * SZ_1K)
 // Disabled to save memory (we can't find where it's used)
 //#define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC1 (9900 * SZ_1K)
-#define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC2 (12288 * SZ_1K)
+#define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC2 (5550 * SZ_1K)
 #define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_MFC0 (14336 * SZ_1K)
 #define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_MFC1 (21504 * SZ_1K)
 #define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMD (S5PV210_LCD_WIDTH * \
@@ -365,7 +361,7 @@ static struct s3cfb_lcd hx8369 = {
 #define  S5PV210_ANDROID_PMEM_MEMSIZE_PMEM (5550 * SZ_1K)
 #define  S5PV210_ANDROID_PMEM_MEMSIZE_PMEM_GPU1 (3000 * SZ_1K)
 #define  S5PV210_ANDROID_PMEM_MEMSIZE_PMEM_ADSP (1500 * SZ_1K)
-#define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_TEXTSTREAM (3000 * SZ_1K)
+#define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_TEXTSTREAM (1024 * SZ_1K)
 
 static struct s5p_media_device aries_media_devs[] = {
 	[0] = {
@@ -3133,7 +3129,8 @@ static struct s3c_platform_camera s5k5ccgx = {
 /* External camera module setting */
 static DEFINE_MUTEX(s5ka3dfx_lock);
 static struct regulator *s5ka3dfx_vga_buck4;
-static struct regulator *s5ka3dfx_vga_avdd;
+/* defined but not used? */
+//static struct regulator *s5ka3dfx_vga_avdd;
 static struct regulator *s5ka3dfx_vga_vddio;
 static struct regulator *s5ka3dfx_cam_isp_host;
 static struct regulator *s5ka3dfx_vga_dvdd;
@@ -3294,7 +3291,7 @@ off_vga_dvdd:
 		pr_err("Failed to disable regulator vga_vddio\n");
 		result = err;
 	}
-off_vga_vddio:
+//off_vga_vddio:
 	err = regulator_disable(s5ka3dfx_vga_buck4);
 	if (err) {
 		pr_err("Failed to disable regulator vga_avdd\n");
@@ -4142,10 +4139,7 @@ static struct platform_device sec_device_jack = {
 #define S5PV210_PS_HOLD_CONTROL_REG (S3C_VA_SYS+0xE81C)
 static void aries_power_off(void)
 {
-	int err;
 	int mode = REBOOT_MODE_NONE;
-	char reset_mode = 'r';
-	int phone_wait_cnt = 0;
 
 	/* Change this API call just before power-off to take the dump. */
 	/* kernel_sec_clear_upload_magic_number(); */
@@ -4156,8 +4150,7 @@ static void aries_power_off(void)
 			/* watchdog reset */
 			pr_info("%s: charger connected, rebooting\n", __func__);
 			mode = REBOOT_MODE_CHARGING;
-			if (sec_set_param_value)
-				sec_set_param_value(__REBOOT_MODE, &mode);
+			sec_set_param_value(__REBOOT_MODE, &mode);
 			//kernel_sec_clear_upload_magic_number();
 			//kernel_sec_hw_reset(1);
 			arch_reset('r', NULL);
@@ -4494,7 +4487,7 @@ static void *aries_wifi_get_country_code(char *ccode)
 
 module_param(wlan_mac, charp, 0664);
 
-static int *aries_wifi_get_mac_addr(unsigned char *buf)
+static int aries_wifi_get_mac_addr(unsigned char *buf)
 {
 	char octet0[3];
 	char octet1[3];
@@ -4535,7 +4528,6 @@ static int *aries_wifi_get_mac_addr(unsigned char *buf)
 		printk("%s: %d - %s is not a valid mac address\n",__func__,__LINE__, wlan_mac);
 		return -EINVAL;
 	}
-
 	return 0;
 }
 
@@ -4802,8 +4794,8 @@ static void __init setup_ram_console_mem(void)
 	ram_console_resource[0].start = ram_console_start;
 	ram_console_resource[0].end = ram_console_start + ram_console_size - 1;
 }
-
-static void __init sound_init(void)
+/* defined but not used */
+/*static void __init sound_init(void)
 {
 	u32 reg;
 
@@ -4827,14 +4819,15 @@ static void __init sound_init(void)
 	gpio_request(GPIO_MICBIAS_EN2, "sub_micbias_enable");
 #endif
 	gpio_request(GPIO_MUTE_ON, "earpath_enable");
-}
+}*/
 
-static void __init onenand_init()
+/* defined but not used? */
+/*static void __init onenand_init(void)
 {
 	struct clk *clk = clk_get(NULL, "onenand");
 	BUG_ON(!clk);
 	clk_enable(clk);
-}
+}*/
 
 static int set_variant_code(const char *val, struct kernel_param *kp)
 {
@@ -4844,6 +4837,8 @@ static int set_variant_code(const char *val, struct kernel_param *kp)
 		platform_device_register(&aries_input_device_usa);
 	else
 		platform_device_register(&aries_input_device_int);
+
+	return 0;
 }
 
 module_param_call(variant_code, set_variant_code, param_get_charp, &variant_code, 0664);
