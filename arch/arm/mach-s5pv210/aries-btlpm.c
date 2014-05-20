@@ -17,7 +17,7 @@
 
 #include <asm/mach-types.h>
 
-#include <mach/gpio-aries.h>
+//#include <mach/gpio-aries.h>
 
 #include "aries.h"
 
