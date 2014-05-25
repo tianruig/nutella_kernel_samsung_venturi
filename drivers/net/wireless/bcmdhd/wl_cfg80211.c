@@ -5115,9 +5115,9 @@ wl_notify_connect_status_ap(struct wl_priv *wl, struct net_device *ndev,
 		case WLC_E_DISASSOC_IND:
 			fc = FC_DISASSOC;
 			break;
-		case WLC_E_DEAUTH_IND:
-			fc = FC_DISASSOC;
-			break;
+//		case WLC_E_DEAUTH_IND:
+//			fc = FC_DISASSOC;
+//			break;
 		case WLC_E_DEAUTH:
 			fc = FC_DISASSOC;
 			break;

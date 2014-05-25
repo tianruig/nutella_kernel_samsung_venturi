@@ -31,7 +31,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <mach/gpio.h>
-#include <mach/gpio-aries.h>
+//#include <mach/gpio-aries.h>
 #include <mach/hardware.h>
 #include <plat/gpio-cfg.h>
 #include <plat/irqs.h>

@@ -140,12 +140,35 @@ void sec_set_param_value(int idx, void *value)
 {
 	printk("%s: idx=%d value=%d\n", __func__,idx, *(int *)value);
 
-	if(idx == __REBOOT_MODE && !manual_mode)
-		write_int(REBOOT_MODE_OFFSET, value);
+	if(manual_mode) return;
+
+	switch(idx)
+	{
+		case __SWITCH_SEL:
+			write_int(SWITCH_SEL_OFFSET, value);
+			break;
+		case __REBOOT_MODE:
+			write_int(REBOOT_MODE_OFFSET, value);
+			break;
+	}
+
 }
 
 void sec_get_param_value(int idx, void *value)
 {
+	int result = -1;
+
+	switch(idx)
+	{
+		case __SWITCH_SEL:
+			result = read_int(SWITCH_SEL_OFFSET);
+			break;
+		case __REBOOT_MODE:
+			result = read_int(REBOOT_MODE_OFFSET);
+			break;
+	}
+	value = &result;
+
 	printk("%s: idx=%d value=%d\n", __func__,idx, *(int *)value);
 }
 

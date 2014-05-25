@@ -5,7 +5,8 @@
 #define S3C_GPIO_SETPIN_ONE 	1
 #define S3C_GPIO_SETPIN_NONE	2
 
-#define S3C_GPIO_EINT S3C_GPIO_SPECIAL(0xF)
+/* defined in arch/arm/plat-samsung/include/plat/gpio-cfg.h already */
+//#define S3C_GPIO_EINT S3C_GPIO_SPECIAL(0xF)
 
 //	GPIO Initialization table
 //	{pin number,      pin conf,        pin value,            pullup/down config}
