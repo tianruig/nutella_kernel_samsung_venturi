@@ -707,7 +707,7 @@ static void s5p_led_set_brightness(struct led_classdev *led_cdev, enum led_brigh
 }
 
 static struct led_classdev s5p_led_classdev = {
-	.name		= "lcd_backlight",
+	.name		= "lcd-backlight",
 	.brightness	= 0,
 	.max_brightness = 255,
 	.flags		= 0,
