@@ -29,12 +29,12 @@
 
 /* Tuneables */
 #define DEBUG                   1
-#define S2W_Y_LIMIT             2350
-#define S2W_X_MAX               1540
-#define S2W_X_B1                500
-#define S2W_X_B2                1000
-#define S2W_X_FINAL             300
-#define S2W_PWRKEY_DUR          60
+#define S2W_Y_LIMIT             800 /* screen height */
+#define S2W_X_MAX               400 /* screen width */
+#define S2W_X_B1                100 /* First x that must be reached in the "swipe" */
+#define S2W_X_B2                300 /* Second x that must be reached in the "swipe" */
+#define S2W_X_FINAL             50  /* Final criteria for complete swipe; must reach screen width - this */
+#define S2W_PWRKEY_DUR          60  /* Milliseconds to "press" power key */
 
 /* Resources */
 int s2w_switch = 1;
