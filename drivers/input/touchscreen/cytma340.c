@@ -1677,8 +1677,8 @@ static int cytouch_early_suspend(struct early_suspend *h)
 {
 	CYTSPDBG("\n[TSP][%s] \n",__func__);
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+	scr_suspended = true;
 	if(s2w_switch){
-		scr_suspended = true;
 		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
 		return;
 	}
@@ -1759,7 +1759,6 @@ static int cytouch_late_resume(struct early_suspend *h)
 	CYTSPDBG("\n[TSP][%s] \n",__func__);
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
 	if(s2w_switch){
-		scr_suspended = false;
 		barrier[0] = false;
 		barrier[1] = false;
 		exec_count = true;
@@ -1793,6 +1792,10 @@ static int cytouch_late_resume(struct early_suspend *h)
 #ifdef CYTSP_WDOG_ENABLE
 	if(g_fw_ver >= 0x5)
 		cytouch_resume_wdog();
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+	scr_suspended = false;
 #endif
 	return 0;
 }

@@ -37,7 +37,7 @@
 #define S2W_PWRKEY_DUR          60  /* Milliseconds to "press" power key */
 
 /* Resources */
-int s2w_switch = 1;
+int s2w_switch = 0;
 bool scr_suspended = false, exec_count = true;
 bool scr_on_touch = false, barrier[2] = {false, false};
 static struct input_dev * sweep2wake_pwrdev;
@@ -161,6 +161,42 @@ void detect_sweep2wake(int x, int y, bool st)
 /*
  * INIT / EXIT stuff below here
  */
+
+static int set_enable(const char *val, struct kernel_param *kp)
+{
+	int max_tries = 10; 
+	int tries = 0;
+	if(scr_suspended){
+		/*
+		 * Meticulus:
+		 * We can't change the "enable" while the screen is off because
+		 * it causes unbalanced irq enable/disable requests. So
+		 * I'm waking the screen and then setting it.
+		 */	
+		printk("s2w: cant enable/disable while screen is off! Waking...\n");
+		sweep2wake_pwrtrigger();
+
+		while(scr_suspended && tries <= max_tries){
+			msleep(200);
+			tries = tries + 1;
+		}
+	}
+	if(strcmp(val, "1") >= 0 || strcmp(val, "true") >= 0){
+		s2w_switch = 1;
+		printk("s2w: enabled\n");
+	}
+	else if(strcmp(val, "0") >= 0 || strcmp(val, "false") >= 0){
+		s2w_switch = 0;
+		printk("s2w: disabled\n");
+	}else {
+		printk("s2w: invalid input '%s' for 'enable'; use 1 or 0\n", val);
+	}
+
+	return 0;
+}
+
+
+module_param_call(enable, set_enable, param_get_int, &s2w_switch, 0664);
 
 static int __init sweep2wake_init(void)
 {
