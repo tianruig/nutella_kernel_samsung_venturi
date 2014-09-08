@@ -26,6 +26,9 @@
 #include <linux/init.h>
 #include <linux/err.h>
 #include <linux/input/sweep2wake.h>
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_WAKELOCK
+#include <linux/wakelock.h>
+#endif
 
 /* Tuneables */
 #define DEBUG                   1
@@ -42,6 +45,11 @@ bool scr_suspended = false, exec_count = true;
 bool scr_on_touch = false, barrier[2] = {false, false};
 static struct input_dev * sweep2wake_pwrdev;
 static DEFINE_MUTEX(pwrkeyworklock);
+
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_WAKELOCK
+static bool use_wakelock = true;
+static struct wake_lock s2w_wake_lock;
+#endif
 
 /* Read cmdline for s2w */
 static int __init read_s2w_cmdline(char *s2w)
@@ -172,8 +180,10 @@ static int set_enable(const char *val, struct kernel_param *kp)
 		 * We can't change the "enable" while the screen is off because
 		 * it causes unbalanced irq enable/disable requests. So
 		 * I'm waking the screen and then setting it.
-		 */	
-		printk("s2w: cant enable/disable while screen is off! Waking...\n");
+		 */
+		if(DEBUG)	
+			printk("s2w: cant enable/disable while screen is off! Waking...\n");
+
 		sweep2wake_pwrtrigger();
 
 		while(scr_suspended && tries <= max_tries){
@@ -183,11 +193,27 @@ static int set_enable(const char *val, struct kernel_param *kp)
 	}
 	if(strcmp(val, "1") >= 0 || strcmp(val, "true") >= 0){
 		s2w_switch = 1;
-		printk("s2w: enabled\n");
+		if(DEBUG)
+			printk("s2w: enabled\n");
+
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_WAKELOCK
+		if(use_wakelock && !wake_lock_active(&s2w_wake_lock)){
+			wake_lock(&s2w_wake_lock);
+			if(DEBUG)
+				printk("s2w: wake lock enabled\n");
+		}
+#endif
 	}
 	else if(strcmp(val, "0") >= 0 || strcmp(val, "false") >= 0){
 		s2w_switch = 0;
-		printk("s2w: disabled\n");
+		if(DEBUG)
+			printk("s2w: disabled\n");
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_WAKELOCK
+		if(wake_lock_active(&s2w_wake_lock)){
+			wake_unlock(&s2w_wake_lock);
+		}
+#endif
+
 	}else {
 		printk("s2w: invalid input '%s' for 'enable'; use 1 or 0\n", val);
 	}
@@ -195,11 +221,41 @@ static int set_enable(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
-
 module_param_call(enable, set_enable, param_get_int, &s2w_switch, 0664);
+
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_WAKELOCK
+
+static int set_use_wakelock(const char *val, struct kernel_param *kp){
+
+	if(strcmp(val, "1") >= 0 || strcmp(val, "true") >= 0){
+		use_wakelock = true;
+		if(use_wakelock && !wake_lock_active(&s2w_wake_lock)){
+			wake_lock(&s2w_wake_lock);
+			if(DEBUG)
+				printk("s2w: wake lock enabled\n");
+		}
+	}
+	else if(strcmp(val, "0") >= 0 || strcmp(val, "false") >= 0){
+		use_wakelock = true;
+		if(wake_lock_active(&s2w_wake_lock)){
+			wake_unlock(&s2w_wake_lock);
+		}
+
+	}else {
+		printk("s2w: invalid input '%s' for 'use_wakelock'; use 1 or 0\n", val);
+	}
+	return 0;
+
+}
+
+module_param_call(use_wakelock, set_use_wakelock, param_get_bool, &use_wakelock, 0664);
+#endif
 
 static int __init sweep2wake_init(void)
 {
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_WAKELOCK
+	wake_lock_init(&s2w_wake_lock, WAKE_LOCK_SUSPEND, "s2w_kernel_wake_lock");
+#endif
 	pr_info("[sweep2wake]: %s done\n", __func__);
 	return 0;
 }
