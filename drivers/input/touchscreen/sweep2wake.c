@@ -31,7 +31,7 @@
 #endif
 
 /* Tuneables */
-#define DEBUG                   1
+#define DEBUG                   0
 #define S2W_Y_LIMIT             800 /* screen height */
 #define S2W_X_MAX               400 /* screen width */
 #define S2W_X_B1                100 /* First x that must be reached in the "swipe" */
