@@ -1763,6 +1763,7 @@ static int cytouch_late_resume(struct early_suspend *h)
 		barrier[1] = false;
 		exec_count = true;
 		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
+		scr_suspended = false;
 		return;
 	}
 #endif
