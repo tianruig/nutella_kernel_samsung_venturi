@@ -31,6 +31,9 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <mach/param.h>
+#ifdef CONFIG_FORCE_FAST_CHARGE
+#include <linux/fastchg.h>
+#endif
 
 /* FSA9480 I2C registers */
 #define FSA9480_REG_DEVID		0x01
@@ -119,6 +122,10 @@ struct fsa9480_usbsw {
 };
 
 static struct fsa9480_usbsw *local_usbsw;
+
+#ifdef CONFIG_FORCE_FAST_CHARGE
+static struct fsa9480_usbsw *last_usbsw;
+#endif
 
 static ssize_t fsa9480_show_control(struct device *dev,
 				   struct device_attribute *attr,
@@ -296,6 +303,9 @@ static void fsa9480_detect_dev(struct fsa9480_usbsw *usbsw)
 	unsigned char val1, val2;
 	struct fsa9480_platform_data *pdata = usbsw->pdata;
 	struct i2c_client *client = usbsw->client;
+#ifdef CONFIG_FORCE_FAST_CHARGE
+	last_usbsw = usbsw;
+#endif
 
 	device_type = i2c_smbus_read_word_data(client, FSA9480_REG_DEV_T1);
 	if (device_type < 0)
@@ -314,7 +324,8 @@ static void fsa9480_detect_dev(struct fsa9480_usbsw *usbsw)
                         { 
                             pdata->usb_cb(FSA9480_ATTACHED); 
                         }
-			if (usbsw->mansw) {
+			if (usbsw->mansw && !force_fast_charge) {
+				printk("force_fast_charge: fsa9480 mansw");
 				ret = i2c_smbus_write_byte_data(client,
 					FSA9480_REG_MANSW1, usbsw->mansw);
 				if (ret < 0)
@@ -437,6 +448,20 @@ static void fsa9480_detect_dev(struct fsa9480_usbsw *usbsw)
 	usbsw->dev1 = val1;
 	usbsw->dev2 = val2;
 }
+
+void fsa9480_force_redetect(void)
+{	
+	if(last_usbsw)
+	{
+		struct fsa9480_platform_data *pdata = last_usbsw->pdata;
+		if(pdata->usb_cb)
+			pdata->usb_cb(FSA9480_DETACHED);
+
+		fsa9480_detect_dev(last_usbsw);
+	}
+}
+
+EXPORT_SYMBOL(fsa9480_force_redetect);
 
 static void fsa9480_usb_detect(struct work_struct *work)
 {

@@ -136,6 +136,10 @@
 
 #include "aries.h"
 
+#ifdef CONFIG_FORCE_FAST_CHARGE
+#include <linux/fastchg.h>
+#endif
+
 struct class *sec_class;
 EXPORT_SYMBOL(sec_class);
 
@@ -3610,9 +3614,25 @@ static void fsa9480_jig_cb(bool attached)
 	return;
 }
 
+static void fsa9480_charger_cb(bool attached)
+{
+	set_cable_status = attached ? CABLE_TYPE_AC : CABLE_TYPE_NONE;
+	if (charger_callbacks && charger_callbacks->set_cable)
+		charger_callbacks->set_cable(charger_callbacks, set_cable_status);
+}
+
 static void fsa9480_usb_cb(bool attached)
 {
 	struct usb_gadget *gadget = platform_get_drvdata(&s3c_device_usbgadget);
+#ifdef CONFIG_FORCE_FAST_CHARGE
+	if (force_fast_charge) {
+		if(gadget)
+			usb_gadget_vbus_disconnect(gadget);
+		fsa9480_charger_cb(attached);
+		printk("force_fast_charge: %s - attached=%d\n",__func__,attached);		
+		return;
+	}
+#endif
 
 	if (gadget) {
 		if (attached)
@@ -3628,20 +3648,24 @@ static void fsa9480_usb_cb(bool attached)
 		charger_callbacks->set_cable(charger_callbacks, set_cable_status);
 }
 
-static void fsa9480_charger_cb(bool attached)
-{
-	set_cable_status = attached ? CABLE_TYPE_AC : CABLE_TYPE_NONE;
-	if (charger_callbacks && charger_callbacks->set_cable)
-		charger_callbacks->set_cable(charger_callbacks, set_cable_status);
-}
-
 static struct switch_dev switch_dock = {
 	.name = "dock",
 };
 
 static void fsa9480_deskdock_cb(bool attached)
 {
+
 	struct usb_gadget *gadget = platform_get_drvdata(&s3c_device_usbgadget);
+#ifdef CONFIG_FORCE_FAST_CHARGE
+	if (force_fast_charge) {
+		if(gadget)
+			usb_gadget_vbus_disconnect(gadget);
+		switch_set_state(&switch_dock, 0);
+		fsa9480_charger_cb(attached);
+		printk("force_fast_charge: %s - attached=%d\n",__func__,attached);
+		return;
+	}
+#endif
 
 	if (attached)
 		switch_set_state(&switch_dock, 1);
@@ -3656,7 +3680,6 @@ static void fsa9480_deskdock_cb(bool attached)
 	}
 
 	mtp_off_status = false;
-
 	set_cable_status = attached ? CABLE_TYPE_MISC : CABLE_TYPE_NONE;
 	if (charger_callbacks && charger_callbacks->set_cable)
 		charger_callbacks->set_cable(charger_callbacks, set_cable_status);
@@ -3664,6 +3687,15 @@ static void fsa9480_deskdock_cb(bool attached)
 
 static void fsa9480_cardock_cb(bool attached)
 {
+#ifdef CONFIG_FORCE_FAST_CHARGE
+	if (force_fast_charge) {
+		fsa9480_charger_cb(attached);
+		printk("force_fast_charge: %s - attached=%d\n",__func__,attached);
+
+		switch_set_state(&switch_dock, 0);
+		return;
+	}
+#endif
 	if (attached)
 		switch_set_state(&switch_dock, 2);
 	else

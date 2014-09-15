@@ -48,6 +48,7 @@ enum {
 };
 
 extern void fsa9480_manual_switching(int path);
+extern void fsa9480_force_redetect(void);
 extern int fsa9480_get_dock_status(void);
 
 #endif /* _FSA9480_H_ */
