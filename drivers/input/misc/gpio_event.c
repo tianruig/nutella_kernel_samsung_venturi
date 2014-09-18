@@ -23,6 +23,9 @@
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
 #include <linux/input/sweep2wake.h>
 #endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+#include <linux/input/doubletap2wake.h>
+#endif
 
 struct gpio_event {
 	struct gpio_event_input_devs *input_devs;
@@ -170,12 +173,18 @@ static int gpio_event_probe(struct platform_device *pdev)
 		input_dev->event = gpio_input_event;
 		ip->input_devs->dev[i] = input_dev;
 
-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+#if defined (CONFIG_TOUCHSCREEN_SWEEP2WAKE) || defined (CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
 		if(strcmp(input_dev->name, "s3c-keypad") == 0){
 			// This is the input device we need to register
-			// with sweep2wake!
+			// with sweep2wake &/or doubletap2wake
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
 			sweep2wake_setdev(ip->input_devs->dev[i]);
 			printk("s2w: registered input_dev\n");
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+			doubletap2wake_setdev(ip->input_devs->dev[i]);
+			printk("dt2w: registered input_dev\n");
+#endif
 
 		}
 #endif	
