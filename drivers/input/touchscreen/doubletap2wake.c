@@ -43,8 +43,7 @@
 /* Resources */
 int dt2w_switch = DT2W_DEFAULT;
 static cputime64_t tap_time_pre = 0;
-static int touch_x = 0, touch_y = 0, touch_nr = 0, x_pre = 0, y_pre = 0;
-static bool touch_x_called = false, touch_y_called = false, touch_cnt = true;
+static int touch_nr = 0, x_pre = 0, y_pre = 0;
 static bool scr_suspended = false, exec_count = true;
 static struct input_dev * doubletap2wake_pwrdev;
 static DEFINE_MUTEX(pwrkeyworklock);
