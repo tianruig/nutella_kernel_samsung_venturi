@@ -28,13 +28,12 @@
 #define SWEEP2WAKE_I2C_SLEEP 40
 
 extern int s2w_switch;
-extern bool scr_suspended;
-extern bool scr_on_touch;
-extern bool exec_count;
-extern bool barrier[2];
 
 /* Sweep2wake main function */
 extern void detect_sweep2wake(int, int, bool);
+
+/* Update Screen state */
+extern void s2w_set_scr_suspended(bool);
 
 /* PowerKey setter */
 extern void sweep2wake_setdev(struct input_dev *);

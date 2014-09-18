@@ -41,8 +41,8 @@
 
 /* Resources */
 int s2w_switch = 0;
-bool scr_suspended = false, exec_count = true;
-bool scr_on_touch = false, barrier[2] = {false, false};
+static bool scr_suspended = false, exec_count = true;
+static bool scr_on_touch = false, barrier[2] = {false, false};
 static struct input_dev * sweep2wake_pwrdev;
 static DEFINE_MUTEX(pwrkeyworklock);
 
@@ -95,11 +95,23 @@ void sweep2wake_pwrtrigger(void) {
         return;
 }
 
+void s2w_reset(void)
+{
+	barrier[0] = false;
+	barrier[1] = false;
+	exec_count = true;
+}
+
 /* Sweep2wake main function */
 void detect_sweep2wake(int x, int y, bool st)
 {
         int prevx = 0, nextx = 0;
         bool single_touch = st;
+	
+	if(!single_touch){
+		s2w_reset();
+		return;
+	}
 #if DEBUG
         pr_info("[sweep2wake]: x,y(%4d,%4d) single:%s\n",
                 x, y, (single_touch) ? "true" : "false");
@@ -169,6 +181,12 @@ void detect_sweep2wake(int x, int y, bool st)
 /*
  * INIT / EXIT stuff below here
  */
+
+void s2w_set_scr_suspended(bool suspended)
+{
+	scr_suspended = suspended;
+	s2w_reset();
+}
 
 static int set_enable(const char *val, struct kernel_param *kp)
 {
