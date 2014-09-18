@@ -1695,17 +1695,15 @@ static int cytouch_early_suspend(struct early_suspend *h)
 #endif
 #if defined (CONFIG_TOUCHSCREEN_SWEEP2WAKE) && defined (CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
 	if(s2w_switch || dt2w_switch){
-		CYTSPDBG("\n[TSP][%s] canceled for s2w or dt \n",__func__);
+		CYTSPDBG("\n[TSP][%s] canceled for s2w or dt2w \n",__func__);
 		return;
 	}
-#endif
-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+#elif CONFIG_TOUCHSCREEN_SWEEP2WAKE
 	if(s2w_switch){
 		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
 		return;
 	}
-#endif
-#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+#elif CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
 	if(dt2w_switch){
 		CYTSPDBG("\n[TSP][%s] canceled for dt2w \n",__func__);
 		return;
@@ -1785,13 +1783,6 @@ int cytouch_hw_set_pwr(CYTOUCH_PWRSTAT onoff)
 static int cytouch_late_resume(struct early_suspend *h)
 {
 	CYTSPDBG("\n[TSP][%s] \n",__func__);
-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-	if(s2w_switch){
-		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
-		s2w_set_scr_suspended(false);
-		return;
-	}
-#endif
 #if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE) && defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
 	if(s2w_switch || dt2w_switch){
 		CYTSPDBG("\n[TSP][%s] canceled for s2w or dt2w\n",__func__);
@@ -1799,8 +1790,13 @@ static int cytouch_late_resume(struct early_suspend *h)
 		dt2w_set_scr_suspended(false);
 		return;
 	}
-#endif
-#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+#elif CONFIG_TOUCHSCREEN_SWEEP2WAKE
+	if(s2w_switch){
+		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
+		s2w_set_scr_suspended(false);
+		return;
+	}
+#elif CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
 	if(s2w_switch){
 		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
 		dt2w_set_scr_suspended(false);
