@@ -31,6 +31,9 @@
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
 #include <linux/input/sweep2wake.h>
 #endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+#include <linux/input/doubletap2wake.h>
+#endif
 
 /*
  *	Operation Features
@@ -1211,7 +1214,12 @@ void  get_message(struct work_struct * p)
 					//	}
 					//}
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-					detect_sweep2wake(g_cytouch_id_stat[i].x, g_cytouch_id_stat[i].y, true);
+					if(s2w_switch)
+						detect_sweep2wake(g_cytouch_id_stat[i].x, g_cytouch_id_stat[i].y, true);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+					if(dt2w_switch)
+						detect_doubletap2wake(g_cytouch_id_stat[i].x, g_cytouch_id_stat[i].y, true);
 #endif
 					input_report_abs(gp_cytouch_input, ABS_MT_POSITION_X, g_cytouch_id_stat[i].x);
 					input_report_abs(gp_cytouch_input, ABS_MT_POSITION_Y, g_cytouch_id_stat[i].y);
@@ -1230,9 +1238,12 @@ void  get_message(struct work_struct * p)
 				g_cytouch_log[i] = 0;
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
 				// Fire this last one and then reset barriers because this is a release.
-				detect_sweep2wake(g_cytouch_id_stat[i].x, g_cytouch_id_stat[i].y, true);
-				barrier[0] = false;
-				barrier[1] = false;
+				if(s2w_switch)
+					detect_sweep2wake(g_cytouch_id_stat[i].x, g_cytouch_id_stat[i].y, false);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+					if(dt2w_switch)
+						detect_doubletap2wake(g_cytouch_id_stat[i].x, g_cytouch_id_stat[i].y, false);
 #endif
 				input_report_abs(gp_cytouch_input, ABS_MT_POSITION_X, g_cytouch_id_stat[i].x);
 				input_report_abs(gp_cytouch_input, ABS_MT_POSITION_Y, g_cytouch_id_stat[i].y);
@@ -1677,9 +1688,26 @@ static int cytouch_early_suspend(struct early_suspend *h)
 {
 	CYTSPDBG("\n[TSP][%s] \n",__func__);
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-	scr_suspended = true;
+	s2w_set_scr_suspended(true);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	dt2w_set_scr_suspended(true);
+#endif
+#if defined (CONFIG_TOUCHSCREEN_SWEEP2WAKE) && defined (CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+	if(s2w_switch || dt2w_switch){
+		CYTSPDBG("\n[TSP][%s] canceled for s2w or dt \n",__func__);
+		return;
+	}
+#endif
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
 	if(s2w_switch){
 		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
+		return;
+	}
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	if(dt2w_switch){
+		CYTSPDBG("\n[TSP][%s] canceled for dt2w \n",__func__);
 		return;
 	}
 #endif
@@ -1759,11 +1787,23 @@ static int cytouch_late_resume(struct early_suspend *h)
 	CYTSPDBG("\n[TSP][%s] \n",__func__);
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
 	if(s2w_switch){
-		barrier[0] = false;
-		barrier[1] = false;
-		exec_count = true;
 		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
-		scr_suspended = false;
+		s2w_set_scr_suspended(false);
+		return;
+	}
+#endif
+#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE) && defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+	if(s2w_switch || dt2w_switch){
+		CYTSPDBG("\n[TSP][%s] canceled for s2w or dt2w\n",__func__);
+		s2w_set_scr_suspended(false);
+		dt2w_set_scr_suspended(false);
+		return;
+	}
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	if(s2w_switch){
+		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
+		dt2w_set_scr_suspended(false);
 		return;
 	}
 #endif
@@ -1796,7 +1836,10 @@ static int cytouch_late_resume(struct early_suspend *h)
 #endif
 
 #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-	scr_suspended = false;
+	s2w_set_scr_suspended(false);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	dt2w_set_scr_suspended(false);
 #endif
 	return 0;
 }
