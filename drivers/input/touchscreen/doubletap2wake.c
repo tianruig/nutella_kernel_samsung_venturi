@@ -137,8 +137,13 @@ void detect_doubletap2wake(int x, int y, bool st)
 				touch_nr++;
 			else
 				doubletap2wake_reset();
+				/* Meticulus:
+				 * A disqualifing 2nd tap should also be a qualifing
+				 * first tap.
+				 */
+				detect_doubletap2wake(x, y, single_touch);
+				return;
 		} else {
-			doubletap2wake_reset();
 			tap_time_pre = ktime_to_ms(ktime_get());
 			x_pre = x;
 			y_pre = y;
