@@ -34,6 +34,12 @@
 #if defined(CONFIG_MACH_VENTURI)
 #include "s3cfb_mdnie.h"
 #endif
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+#include <linux/input/sweep2wake.h>
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+#include <linux/input/doubletap2wake.h>
+#endif
 
 
 // Brightness Level 
@@ -420,6 +426,18 @@ static int get_pwm_value_from_bl(int level)
 static int update_brightness(int level)
 {
 	unsigned int led_val;
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+	if(!level)
+		s2w_set_scr_suspended(true);
+	else
+		s2w_set_scr_suspended(false);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	if(!level)
+		dt2w_set_scr_suspended(true);
+	else
+		dt2w_set_scr_suspended(false);
+#endif
 
 	// check LDI Status
 	wait_ldi_enable();
