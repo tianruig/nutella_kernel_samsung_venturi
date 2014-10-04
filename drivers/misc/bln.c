@@ -273,6 +273,32 @@ static ssize_t notification_led_mask_write(struct device *dev,
 	return size;
 }
 
+static ssize_t blink_mode_read(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", bln_blink_mode);
+}
+
+static ssize_t blink_mode_write(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	unsigned int data;
+
+	if (sscanf(buf, "%u\n", &data) != 1) {
+		pr_info("%s: input error\n", __FUNCTION__);
+		return size;
+	}
+
+	if (data >= 0 && data < 1) {
+		bln_blink_mode = data;
+	} else {
+		pr_info("%s: wrong input %u\n", __FUNCTION__, data);
+	}
+
+	return size;
+}
+
+
 static ssize_t blink_control_read(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -395,6 +421,8 @@ static DEVICE_ATTR(buttons_led, S_IRUGO | S_IWUGO,
 		buttons_led_status_write);
 #endif
 
+static DEVICE_ATTR(blink_mode, S_IRUGO | S_IWUGO, blink_mode_read,
+		blink_mode_write);
 static DEVICE_ATTR(blink_control, S_IRUGO | S_IWUGO, blink_control_read,
 		blink_control_write);
 static DEVICE_ATTR(enabled, S_IRUGO | S_IWUGO,

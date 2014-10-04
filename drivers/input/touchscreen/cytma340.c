@@ -28,6 +28,12 @@
 #include <plat/regs-watchdog.h>
 
 #include <linux/leds.h>
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+#include <linux/input/sweep2wake.h>
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+#include <linux/input/doubletap2wake.h>
+#endif
 
 /*
  *	Operation Features
@@ -1141,7 +1147,6 @@ void  get_message(struct work_struct * p)
 		{
 			dx = abs(g_cytouch_id_stat[point[i].id].x - point[i].x);
 			dy = abs(g_cytouch_id_stat[point[i].id].y - point[i].y);
-
 			if(dx <= 1 && dy <= 1)
 			{
 				if(num_of_touch < 2)
@@ -1208,6 +1213,14 @@ void  get_message(struct work_struct * p)
 					//		g_cytouch_log[i] = 1;
 					//	}
 					//}
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+					if(s2w_switch)
+						detect_sweep2wake(g_cytouch_id_stat[i].x, g_cytouch_id_stat[i].y, true);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+					if(dt2w_switch)
+						detect_doubletap2wake(g_cytouch_id_stat[i].x, g_cytouch_id_stat[i].y, true);
+#endif
 					input_report_abs(gp_cytouch_input, ABS_MT_POSITION_X, g_cytouch_id_stat[i].x);
 					input_report_abs(gp_cytouch_input, ABS_MT_POSITION_Y, g_cytouch_id_stat[i].y);
 					input_report_abs(gp_cytouch_input, ABS_MT_WIDTH_MAJOR, ((i<<8)| g_cytouch_id_stat[i].z));
@@ -1223,6 +1236,15 @@ void  get_message(struct work_struct * p)
 				//if (checkTSPKEYdebuglevel != KERNEL_SEC_DEBUG_LEVEL_LOW)
 				//	CYTSPDBG("UP[%d](%d,%d,%d,%d)\n", i, g_cytouch_id_stat[i].x, g_cytouch_id_stat[i].y, g_cytouch_id_stat[i].z, i);
 				g_cytouch_log[i] = 0;
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+				// Fire this last one and then reset barriers because this is a release.
+				if(s2w_switch)
+					detect_sweep2wake(g_cytouch_id_stat[i].x, g_cytouch_id_stat[i].y, false);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+					if(dt2w_switch)
+						detect_doubletap2wake(g_cytouch_id_stat[i].x, g_cytouch_id_stat[i].y, false);
+#endif
 				input_report_abs(gp_cytouch_input, ABS_MT_POSITION_X, g_cytouch_id_stat[i].x);
 				input_report_abs(gp_cytouch_input, ABS_MT_POSITION_Y, g_cytouch_id_stat[i].y);
 				input_report_abs(gp_cytouch_input, ABS_MT_WIDTH_MAJOR, ((i<<8)| g_cytouch_id_stat[i].z) );
@@ -1664,9 +1686,31 @@ static int cytouch_resume(struct platform_device *dev)
 #ifdef USE_TSP_EARLY_SUSPEND
 static int cytouch_early_suspend(struct early_suspend *h)
 {
+	CYTSPDBG("\n[TSP][%s] \n",__func__);
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+	s2w_set_scr_suspended(true);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	dt2w_set_scr_suspended(true);
+#endif
+#if defined (CONFIG_TOUCHSCREEN_SWEEP2WAKE) && defined (CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+	if(s2w_switch || dt2w_switch){
+		CYTSPDBG("\n[TSP][%s] canceled for s2w or dt2w \n",__func__);
+		return;
+	}
+#elif CONFIG_TOUCHSCREEN_SWEEP2WAKE
+	if(s2w_switch){
+		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
+		return;
+	}
+#elif CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	if(dt2w_switch){
+		CYTSPDBG("\n[TSP][%s] canceled for dt2w \n",__func__);
+		return;
+	}
+#endif
 	g_suspend_state = TRUE;
 
-	CYTSPDBG("\n[TSP][%s] \n",__func__);
 
 #if TOUCH_DVFS_CONTROL
 	cancel_delayed_work_sync(&g_cytouch_dwork);
@@ -1739,6 +1783,26 @@ int cytouch_hw_set_pwr(CYTOUCH_PWRSTAT onoff)
 static int cytouch_late_resume(struct early_suspend *h)
 {
 	CYTSPDBG("\n[TSP][%s] \n",__func__);
+#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE) && defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+	if(s2w_switch || dt2w_switch){
+		CYTSPDBG("\n[TSP][%s] canceled for s2w or dt2w\n",__func__);
+		s2w_set_scr_suspended(false);
+		dt2w_set_scr_suspended(false);
+		return;
+	}
+#elif CONFIG_TOUCHSCREEN_SWEEP2WAKE
+	if(s2w_switch){
+		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
+		s2w_set_scr_suspended(false);
+		return;
+	}
+#elif CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	if(s2w_switch){
+		CYTSPDBG("\n[TSP][%s] canceled for s2w \n",__func__);
+		dt2w_set_scr_suspended(false);
+		return;
+	}
+#endif
 
 #if 0 /* TOUCH_DVFS_CONTROL */
 	s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_7, L0);
@@ -1765,6 +1829,13 @@ static int cytouch_late_resume(struct early_suspend *h)
 #ifdef CYTSP_WDOG_ENABLE
 	if(g_fw_ver >= 0x5)
 		cytouch_resume_wdog();
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+	s2w_set_scr_suspended(false);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	dt2w_set_scr_suspended(false);
 #endif
 	return 0;
 }

@@ -57,6 +57,12 @@ if grep -q bootmode=2 /proc/cmdline ; then
 
 	# disable lpm
 	echo 0 > /sys/class/power_supply/battery/charging_mode_booting
+else
+	#load custom ramdisk if it's there
+	if test -e /cache/custom_ramdisk/ramdisk.cpio ; then
+		image=/cache/custom_ramdisk/ramdisk.cpio
+	fi
+
 fi
 
 cpio -i < ${image}
