@@ -111,6 +111,10 @@
 
 int usb_cable, uart_cable;
 
+#ifdef CONFIG_USB_S3C_OTG_HOST
+extern void set_otghost_mode(int mode);
+#endif
+ 
 struct fsa9480_usbsw {
 	struct i2c_client		*client;
 	struct fsa9480_platform_data	*pdata;
@@ -332,6 +336,17 @@ static void fsa9480_detect_dev(struct fsa9480_usbsw *usbsw)
 					dev_err(&client->dev,
 						"%s: err %d\n", __func__, ret);
 			}
+#ifdef CONFIG_USB_S3C_OTG_HOST 
+// sztupy: handle automatic otg switching
+			if (val1 & DEV_USB_OTG) {
+				// otg cable detected
+				set_otghost_mode(2);
+			} else {
+				// client cable detected
+				set_otghost_mode(1);
+			}
+#endif
+
 		/* UART */
 		} else if (val1 & DEV_T1_UART_MASK || val2 & DEV_T2_UART_MASK) {
 			if (pdata->uart_cb)
@@ -393,8 +408,13 @@ static void fsa9480_detect_dev(struct fsa9480_usbsw *usbsw)
 		/* USB */
 		if (usbsw->dev1 & DEV_T1_USB_MASK ||
 				usbsw->dev2 & DEV_T2_USB_MASK) {
-			if (pdata->usb_cb && usbsw->is_usb_ready )
-				pdata->usb_cb(FSA9480_DETACHED);
+			if (pdata->usb_cb && usbsw->is_usb_ready ){
+ 				pdata->usb_cb(FSA9480_DETACHED);
+#ifdef CONFIG_USB_S3C_OTG_HOST 
+				// sztupy: also switch off otg host mode
+				set_otghost_mode(0);
+#endif			
+			}
 		/* UART */
 		} else if (usbsw->dev1 & DEV_T1_UART_MASK ||
 				usbsw->dev2 & DEV_T2_UART_MASK) {
