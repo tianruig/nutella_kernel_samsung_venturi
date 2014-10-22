@@ -46,7 +46,7 @@ if test $(busybox cat /sys/module/param/parameters/reboot_mode) == 2 ; then
 fi
 
 # Recovery check
-if grep -q bootmode=2 /proc/cmdline ; then
+if test -e /cache/.startrecovery || grep -q bootmode=2 /proc/cmdline ; then
 
 	#load custom recovery ramdisk if it's there
 	if test -e /cache/custom_recovery/ramdisk-recovery.cpio ; then
@@ -57,6 +57,8 @@ if grep -q bootmode=2 /proc/cmdline ; then
 
 	# disable lpm
 	echo 0 > /sys/class/power_supply/battery/charging_mode_booting
+
+	rm -rf /cache/.startrecovery
 else
 	#load custom ramdisk if it's there
 	if test -e /cache/custom_ramdisk/ramdisk.cpio ; then
