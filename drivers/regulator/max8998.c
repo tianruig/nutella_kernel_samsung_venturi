@@ -34,6 +34,8 @@
 #include <linux/mfd/max8998.h>
 #include <linux/mfd/max8998-private.h>
 
+
+
 struct max8998_data {
 	struct device		*dev;
 	struct max8998_dev	*iodev;
@@ -976,7 +978,6 @@ static __devinit int max8998_pmic_probe(struct platform_device *pdev)
 			goto err;
 		}
 	}
-
 
 	return 0;
 err:
